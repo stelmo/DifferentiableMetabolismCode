@@ -1,7 +1,7 @@
 using JSON, ColorSchemes, CairoMakie, DataFrames, DataFramesMeta, Chain, CSV, COBREXA
 
 #: load kcat data
-rdir = "linesearch2"
+rdir = "linesearch"
 params_dir = filter(endswith("params.csv"), readdir(joinpath("results", rdir)))
 
 kmax_df = DataFrame(Condition = String[], KcatID = String[], Kmax = Float64[])

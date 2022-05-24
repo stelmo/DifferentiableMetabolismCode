@@ -42,10 +42,3 @@ end
 open(joinpath("analyses", "gecko", "gid_mass.json"), "w") do io 
     JSON.print(io, gn_gm)
 end
-
-b0432 and b0431 and b0429 and b0430
-
-gn_gm["b0432"]
-gn_gm["b0431"]
-gn_gm["b0429"]
-gn_gm["b0430"]

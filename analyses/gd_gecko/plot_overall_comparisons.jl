@@ -101,7 +101,7 @@ for (label, layout) in zip(["A", "B"], [ga, gb])
 end
 
 fig
-CairoMakie.FileIO.save(joinpath("docs", "imgs", "kmax_comparison.pdf"), fig)
+CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "imgs", "kmax_comparison.pdf"), fig)
 
 
 using GLM

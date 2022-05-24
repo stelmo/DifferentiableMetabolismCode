@@ -122,12 +122,7 @@ Visualize.plot_escher_viz(
     joinpath("data", "maps", "simplified_core_iml1515_map.json"),
 )
 fig
-CairoMakie.FileIO.save(joinpath("docs", "imgs", "gecko_map_iml1515.pdf"), fig)
-
-#: Load experimental data
-
-gid_mass = JSON.parsefile(joinpath("analyses", "gecko", "gid_mass.json"))
-rid_mass = JSON.parsefile(joinpath("analyses", "gecko", "rid_mass.json"))
+CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "imgs", "gecko_map_iml1515.pdf"), fig)
 
 #: plot sensitivities
 
@@ -191,7 +186,11 @@ end
 
 fig
 
-CairoMakie.FileIO.save(joinpath("docs", "imgs", "gecko_sens_iml1515.pdf"), fig)
+CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "imgs", "gecko_sens_iml1515.pdf"), fig)
+
+#: Plot proteome masses vs sensitivities
+gid_mass = JSON.parsefile(joinpath("results", "proteomic_mass", "gid_mass.json"))
+rid_mass = JSON.parsefile(joinpath("results", "proteomic_mass", "rid_mass.json"))
 
 fig = Figure(backgroundcolor = :transparent);
 ax = Axis(
@@ -221,31 +220,12 @@ scatter!(ax, cf, ms)
 hidexdecorations!(ax, ticks = false, ticklabels = false, label = false)
 hideydecorations!(ax, ticks = false, ticklabels = false, label = false)
 fig
-CairoMakie.FileIO.save(joinpath("docs", "imgs", "gecko_flux_control_vs_proteome.pdf"), fig)
+CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "imgs", "gecko_flux_control_vs_proteome.pdf"), fig)
 
 using GLM, DataFrames
 df = DataFrame(Y = log10.(ms), X = log10.(cf))
 f = lm(@formula(Y ~ X), df)
 r2(f)
-
-# function align_ylabels!(axs...)
-#     max_extent = maximum(axs) do ax
-#         tight_yticklabel_spacing!(ax)
-#         ax.yticklabelspace[]
-#     end
-#     for ax in axs
-#         ax.yticklabelspace = max_extent
-#     end
-#     return
-# end
-
-
-# f = Figure()
-# ax1 = Axis(f[1, 1], ylabel = "Y Label")
-# ax2 = Axis(f[2, 1], limits = (nothing, (1000, 9000)), ylabel = "Y Label")
-# ax3 = Axis(f[3, 1], limits = (nothing, (0.0001, 0.0002)), ylabel = "Y Label")
-# align_ylabels!(ax1, ax2, ax3)
-# f
 
 #! compare to flux control coefficients
 fcc = Dict()
@@ -319,6 +299,6 @@ hideydecorations!(ax, ticks = false, ticklabels = false, label = false)
 fig
 
 CairoMakie.FileIO.save(
-    joinpath("docs", "imgs", "gecko_sens_vs_flux_control_coefficients.pdf"),
+    joinpath("..", "DifferentiableMetabolismPaper", "docs", "imgs", "gecko_sens_vs_flux_control_coefficients.pdf"),
     fig,
 )

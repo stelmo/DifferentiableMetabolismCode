@@ -39,7 +39,7 @@ end
 #: Plot figure
 fig = Figure(
     resolution = (1200, 600),
-    # backgroundcolor=:transparent,
+    backgroundcolor=:transparent,
 );
 
 ax = Axis(
@@ -57,18 +57,25 @@ ax2 = Axis(
 hlines!(ax, 0.0, color = ColorSchemes.Greys_9[3])
 vlines!(ax, 1:3:(length(dirs)*3), color = ColorSchemes.Greys_9[3], linestyle = :dash)
 
-f(x, y) = x == 1 ? -1 : y == 1 ? 1 : 0
+fdir(x, y) = x == 1 ? -1 : y == 1 ? 1 : 0
 for (resi, res) in zip(1:3:length(dirs)*3, dirs)
     # (resi, res) = first(zip(1:3:length(dirs)*3, dirs))
-    df = DataFrame(CSV.File(joinpath("analyses", "michaelis_menten_gecko", "results", res)))
+    df = DataFrame(CSV.File(joinpath("results", "crispr", res)))
     @transform!(
         df,
         :Metabolite = last.(split.(:Metabolite, "#")),
-        :SubOrProdorNot = f.(:Substrate, :Product),
+        :SubOrProdorNot = fdir.(:Substrate, :Product),
     )
     @subset! df begin
         :Metabolite .!= "h_c"
         :Metabolite .!= "pi_c"
+        :Metabolite .!= "h2o_c"
+        :Metabolite .!= "h_p"
+        :Metabolite .!= "pi_p"
+        :Metabolite .!= "h2o_p"
+        :Metabolite .!= "h_e"
+        :Metabolite .!= "pi_e"
+        :Metabolite .!= "h2o_e"
     end
 
     sub_df = unique(@subset(df, :SubOrProdorNot .== -1), :Metabolite)
@@ -229,4 +236,4 @@ Legend(
 
 fig
 
-CairoMakie.FileIO.save(joinpath("docs", "imgs", "crispr.pdf"), fig)
+CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "imgs", "crispr.pdf"), fig)

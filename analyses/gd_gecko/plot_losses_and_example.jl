@@ -1,8 +1,7 @@
 using JSON,
     ColorSchemes, CairoMakie, DataFrames, DataFramesMeta, Chain, CSV, COBREXA, Statistics
 
-# rdir = "beta10.99beta20.999"
-rdir = "linesearch2"
+rdir = "linesearch"
 losses_dir = filter(endswith("losses.csv"), readdir(joinpath("results", rdir)))
 params_dir = filter(endswith("params.csv"), readdir(joinpath("results", rdir)))
 
@@ -191,4 +190,4 @@ end
 
 fig
 
-CairoMakie.FileIO.save(joinpath("docs", "imgs", "gd_iteration_charact.pdf"), fig)
+CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "imgs", "gd_iteration_charact.pdf"), fig)
