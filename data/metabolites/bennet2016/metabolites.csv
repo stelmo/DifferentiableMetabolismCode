@@ -1,0 +1,98 @@
+Metabolite	MetaboliteID	ConcentrationMolar
+Glutamate	glu__L_c	9.60E-02
+Fructose-1,6-bisphosphate	fdp_c	1.50E-02
+ATP	atp_c	9.60E-03
+UDP-N-acetyl-D-glucosamine 	uacgam_c	9.20E-03
+UTP	utp_c	8.30E-03
+GTP	gtp_c	4.90E-03
+dTTP	dttp_c	4.60E-03
+Aspartate	asp_c	4.20E-03
+Valine	val__L_c	4.00E-03
+Glutamine	gln__L_c	3.80E-03
+6-Phospho-D-gluconate 	6pgc_c	3.80E-03
+CTP	ctp_c	2.70E-03
+Alanine	ala__L_c	2.60E-03
+NAD	nad_c	2.60E-03
+UDP-glucose	udpg_c	2.50E-03
+Uridine	uri_c	2.10E-03
+citrate	cit_c	2.00E-03
+UDP	udp_c	1.80E-03
+Malate	mal__L_c	1.70E-03
+3-Phosphoglycerate	3pg_c	1.50E-03
+Glycerate	glyc__R_c	1.40E-03
+CoenzymeA	coa_c	1.40E-03
+Citrulline	citr__L_c	1.40E-03
+Glucosamine 6 phosphate	gam6p_c	1.20E-03
+Acetylphosphate	actp_c	1.10E-03
+Gluconolactone	6pgl_c	1.00E-03
+GDP	gdp_c	6.80E-04
+Acetyl-CoA	accoa_c	6.10E-04
+Carbamylaspartate	cbasp_c	5.90E-04
+arginine	arg__L_c	5.70E-04
+Succinate	succ_c	5.70E-04
+UDP-glucuronate	udpglcur_c	5.70E-04
+ADP	adp_c	5.60E-04
+Asparagine	asn__L_c	5.10E-04
+Alpha-ketoglutarate	akg_c	4.40E-04
+Lysine	lys__L_c	4.10E-04
+Proline	pro__L_c	3.90E-04
+dTDP	dtdp_c	3.80E-04
+Dihydroxyacetone phosphate	dhap_c	3.70E-04
+Homocysteine	hcys__L_c	3.70E-04
+CMP	cmp_c	3.60E-04
+Deoxyribose 5-P	5drib_c	3.00E-04
+AMP	amp_c	2.80E-04
+Inosine monophosphate	imp_c	2.70E-04
+PRPP	prpp_c	2.60E-04
+Succinyl-CoA	succoa_c	2.30E-04
+Inosine triphosphate	itp_c	2.10E-04
+Guanine	gua_c	1.90E-04
+Phosphoenolpyruvate	pep_c	1.80E-04
+S-Adenosyl-L-methionine	amet_c	1.80E-04
+Threonine	thr__L_c	1.80E-04
+FAD	fad_c	1.70E-04
+Methionine	met__L_c	1.50E-04
+2,3 Dihydroxybenzoic acid	23dhb_c	1.40E-04
+NADPH	nadph_c	1.20E-04
+Fumarate	fum_c	1.20E-04
+Phenylpyruvate	phpyr_c	9.00E-05
+NADH	nadh_c	8.30E-05
+N-acetyl-glucosamine 1 phosphate	acgam1p_c	8.20E-05
+Serine	ser__L_c	6.80E-05
+Histidine	his__L_c	6.80E-05
+Flavin Mononucleotide	fmn_c	5.40E-05
+4-hydroxybenzoate	4hbz_c	5.20E-05
+dGMP	dgmp_c	5.10E-05
+Glycerol 3 phosphate	glyc3p_c	4.90E-05
+N acetyl orthithine	acorn_c	4.30E-05
+Gluconate	glcn_c	4.20E-05
+Malonyl CoA	malcoa_c	3.50E-05
+Cyclic AMP	camp_c	3.50E-05
+dCTP	dctp_c	3.50E-05
+Tyrosine	tyr__L_c	2.90E-05
+Inosine diphosphate	idp_c	2.40E-05
+GMP	gmp_c	2.40E-05
+Acetoacetyl CoA	aacoa_c	2.20E-05
+Riboflavin	ribflv_c	1.90E-05
+Phenylalanine	phe__L_c	1.80E-05
+Cis-aconitate	acon_C_c	1.60E-05
+dATP	datp_c	1.60E-05
+cytosine	csn_c	1.40E-05
+Shikimate	skm_c	1.40E-05
+Histidinol	histd_c	1.30E-05
+Tryptophan	trp__L_c	1.20E-05
+Dihydroorotate	dhor__S_c	1.20E-05
+Quinolinate	quln_c	1.20E-05
+dAMP	damp_c	8.80E-06
+Adenosine phosphosulfate	aps_c	6.60E-06
+Myo-inositol	inost_c	5.70E-06
+Propionyl-CoA	ppcoa_c	5.30E-06
+ADP glucose	adpglc_c	4.30E-06
+Anthranilate	anth_c	3.50E-06
+Deoxyadenosine	dad_2_c	2.80E-06
+cytidine	cytd_c 	2.60E-06
+nadp	nadp_c	2.10E-06
+guanosine	gsn_c	1.60E-06
+adenine	ade_c	1.50E-06
+Deoxyguanosine	dgsn_c	5.20E-07
+Adenosine	adn_c	1.30E-07

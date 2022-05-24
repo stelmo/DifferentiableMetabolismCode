@@ -1,0 +1,7 @@
+Downloaded from Uniprot (https://www.uniprot.org/) on 2022/04/07
+E. coli search terms: reviewed:yes AND organism: "Escherichia coli (strain K12) [83333]"
+S. cere search terms: reviewed:yes AND organism: "Saccharomyces cerevisiae (strain ATCC 204508 / S288c) (Baker's yeast) [559292]"
+
+Downloaded from Complex Portal (https://www.ebi.ac.uk/complexportal/home) on 2022/04/07
+83333.tsv = E. coli K12 complex database
+559292.tsv =  S. cerevisiae complex database

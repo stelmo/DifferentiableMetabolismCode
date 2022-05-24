@@ -1,0 +1,4 @@
+Model files downloaded from urls on 2022-04-22T13:12:29.676
+Consensus yeast model: https://raw.githubusercontent.com/SysBioChalmers/yeast-GEM/main/model/yeast-GEM.mat
+E. coli iML1514 model: http://bigg.ucsd.edu/static/models/iML1515.json
+E. coli core model: http://bigg.ucsd.edu/static/models/e_coli_core.json
