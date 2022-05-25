@@ -64,8 +64,7 @@ function plot_heatmap(
     return ylabs
 end
 
-function get_core_metabolism(model)
-    core_met_loc = "data/maps/core_iml1515.json"
+function get_core_metabolism(model, core_met_loc)
     coremet = JSON.parsefile(core_met_loc)
     core_rxns = [rxn["bigg_id"] for rxn in values(coremet[2]["reactions"])]
     rxns = intersect(core_rxns, reactions(model))

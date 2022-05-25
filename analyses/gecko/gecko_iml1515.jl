@@ -96,8 +96,8 @@ flux_summary(sol)
 include(joinpath("analyses", "visualize.jl"))
 using .Visualize
 
-rids, gids, mids = Visualize.get_core_metabolism(pmodel)
-filter!(!startswith("EX_"), rids)
+rids, gids, mids = Visualize.get_core_metabolism(pmodel, "data/maps/simplified_core_iml1515_map.json")
+# filter!(!startswith("EX_"), rids)
 
 #: plot map
 fig = Figure(resolution = (1000, 1000), backgroundcolor = :transparent);
