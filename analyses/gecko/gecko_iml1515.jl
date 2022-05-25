@@ -197,25 +197,27 @@ ax = Axis(
     fig[1,1],
     yscale=log10,
     xscale=log10,
-    ylabel="Mass fraction (fg/cell)",
-    xlabel="Sum of control coefficients",
+    ylabel="Mass fraction of enzyme in reaction (fg/cell)",
+    xlabel="Scaled flux control coefficient of reaction",
 )
 
 rids = [(last(split(x, "#")), i) for (i, x) in enumerate(diffmodel.param_ids)]
 for (k, v) in rid_mass
     v == 0 && delete!(rid_mass, k)
     # remove transporters, poor proteomic resolution
-    if contains("transport", model.reactions[k].name)
+    if contains(model.reactions[k].name, "transport") || contains(model.reactions[k].name, "Transport") 
         delete!(rid_mass, k)
     end 
 end
 filter!(x -> haskey(rid_mass, x[1]), rids)
 idxs = [x[2] for x in rids]
 rids = [x[1] for x in rids]
-nrxns = count(true for x in diffmodel.var_ids if startswith(x, "b"))
-ndx = dx[1:nrxns, idxs]
-cf = sum(abs, ndx, dims=1)[:]
+rs = filter(!startswith("b"), first.(split.(diffmodel.var_ids, "#")))
+nrxns = length(rs)
+rlu = Dict(r => first(indexin([r], rs)) for r in rids)
+cf = [dx[rlu[r], i] for (r, i) in zip(rids, idxs)]
 ms = [rid_mass[r] for r in rids]
+
 scatter!(ax, cf, ms)
 hidexdecorations!(ax, ticks = false, ticklabels = false, label = false)
 hideydecorations!(ax, ticks = false, ticklabels = false, label = false)
