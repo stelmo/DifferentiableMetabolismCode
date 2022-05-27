@@ -1,16 +1,12 @@
 using COBREXA, DifferentiableMetabolism
 using CPLEX, JSON, SparseArrays, Statistics, Serialization, SparseArrays, LinearAlgebra
 using DataFrames, DataFramesMeta, Chain, CSV, CairoMakie, ColorSchemes
+using KNITRO 
 
 include(joinpath("analyses", "metabolite_estimates.jl"))
 using .MetaboliteEstimates
 
-ref_cond = "pykA"
-
-#: load growth rates
-growth_df = DataFrame(
-    CSV.File(joinpath("results", "michaelis_menten_gecko", "crispr_growth.csv")),
-)
+ref_cond = "purB"
 
 #: import model and data files
 base_load_path = joinpath("model_construction", "processed_models_files", "ecoli")
@@ -60,14 +56,12 @@ knockdown_df = transform(
 knockdown_df = flatten(knockdown_df, :Reaction)
 
 #: Get reference and KD ids 
-# kd_cond = ref_cond * " + aTC"
 df = @subset knockdown_df begin
     :Target .== ref_cond
 end
 rid_kds = String.(strip.(df[!, :Reaction]))
 
-μ_ref = first(growth_df[growth_df[!, :Condition].==ref_cond, :Growth])
-target_gene = first(knockdown_df[knockdown_df[!, :Target].==ref_cond, :Gene])
+target_gene = String(first(knockdown_df[knockdown_df[!, :Target].==ref_cond, :Gene]))
 
 gm = make_gecko_model(
     model;
@@ -76,6 +70,33 @@ gm = make_gecko_model(
     gene_product_molar_mass,
     gene_product_mass_group_bound,
 )
+
+rfluxes_ref = flux_balance_analysis_dict(
+    gm,
+    CPLEX.Optimizer;
+    modifications = [
+        change_optimizer_attribute("CPXPARAM_Emphasis_Numerical", 1),
+        change_optimizer_attribute("CPX_PARAM_SCAIND", 1),
+        COBREXA.silence,
+    ],
+)
+μ_ref = rfluxes_ref["BIOMASS_Ec_iML1515_core_75p37M"]
+
+opt_model = flux_balance_analysis(
+    gm,
+    CPLEX.Optimizer;
+    modifications = [
+        change_optimizer_attribute("CPXPARAM_Emphasis_Numerical", 1),
+        change_optimizer_attribute("CPX_PARAM_SCAIND", 1),
+        COBREXA.silence,
+        change_objective(target_gene; sense = COBREXA.MAX_SENSE),
+        change_constraint("BIOMASS_Ec_iML1515_core_75p37M"; lb = μ_ref, ub = 1000),
+    ],
+)
+rfluxes_ref = flux_dict(gm, opt_model)
+gpconcs_ref = gene_product_dict(gm, opt_model)
+tg_ref = gpconcs_ref[target_gene]
+flux_summary(rfluxes_ref)
 
 opt_model = flux_balance_analysis(
     gm,
@@ -86,11 +107,14 @@ opt_model = flux_balance_analysis(
         COBREXA.silence,
         change_objective(genes(gm); sense = COBREXA.MIN_SENSE),
         change_constraint("BIOMASS_Ec_iML1515_core_75p37M"; lb = μ_ref, ub = 1000),
+        change_constraint(target_gene; lb = tg_ref, ub = 100_000),
     ],
 )
 rfluxes_ref = flux_dict(gm, opt_model)
 gpconcs_ref = gene_product_dict(gm, opt_model)
 flux_summary(rfluxes_ref)
+
+# model = prune_model(model, rfluxes_ref)
 
 #: Get knockdown condition
 kd_factor = 5
@@ -144,34 +168,24 @@ for (rid, td) in _rid_km
     end
 end
 
-del_list = [ # these reactions don't get a km because they are wildly different from brenda
-    "SUCDi"
-    "IGPDH"
-    "IG3PS"
-    "DHDPRy"
-    "DMPPS"
-    "IPDPS"
-    "DHDPS"
-    "ECOAH7"
-    "DHAD2"
-    "DHAD1"
-    "ACACT7r"
-    "MTHFR2"
-    "PERD"
-    "E4PD"
+del_list = [ 
+    "ACOAD6f"
+    "ANPRT"
+    "CPPPGO"
+    "ACOAD5f"
+    "ACOAD3f"
     "DHORD2"
-    "MDH2"
-    "GLCDpp"
-    "ASPO3"
-    "CYTBO3_4pp"
-    "NADH16pp"
-    "FDH4pp"
-    "DHORD5"
-    "GLYCTO2"
-    "FRD2"
-    "MDH3"
-    "ASPO3"
+    "ACOAD7f"
+    "AHCYSNS"
+    "HACD2"
+    "HACD4"
+    "HACD7"
+    "HACD6"
+    "HACD1"
+    "HACD5"
+    "HACD3"
 ]
+
 delete!.(Ref(rid_km), del_list) # trial and error
 
 _km_concs = Dict{String,Vector{Float64}}()
@@ -244,6 +258,23 @@ mmdf = MetaboliteEstimates.get_thermo_and_saturation_concentrations(
     modifications = [COBREXA.silence],
 )
 
+minlims = MetaboliteEstimates.min_limitation(
+    pmodel,
+    rid_dg0,
+    rid_km,
+    mmdf.concentrations,
+    2.0,
+    optimizer_with_attributes(KNITRO.Optimizer,"honorbnds" => 1);
+    flux_solution = loopless_sol,
+    proton_ids = ["h_c", "h_e", "h_p"],
+    water_ids = ["h2o_c", "h2o_e", "h2o_p"],
+    concentration_lb = mid -> get(km_concs, mid, 1e-6) / 1000,
+    concentration_ub = mid -> get(km_concs, mid, 0.1 / 10) * 10,
+    ignore_reaction_ids = ["Htex", "H2Otex", "H2Otpp"],
+    modifications = [COBREXA.silence],
+    ignore_metabolite_ids = ["h_c", "h_e", "h_p", "h2o_c", "h2o_e", "h2o_p"],
+)
+
 #: Differentiate but take into account kinetics
 pgm_kd = make_gecko_model(
     pmodel;
@@ -277,7 +308,7 @@ diffmodel = with_parameters(
     rid_enzyme;
     rid_dg0,
     rid_km,
-    mid_concentration = mmdf.concentrations,
+    mid_concentration = minlims.concentrations,
     scale_equality = true,
     scale_inequality = true,
     ignore_reaction_ids = ["Htex", "H2Otex", "H2Otpp"],
@@ -320,11 +351,6 @@ end
 
 idxs = sortperm(dgs .* sats)
 x = [rids[idxs] sats[idxs] dgs[idxs] sats[idxs] .* dgs[idxs]]
-
-
-
-
-
 
 #: check if solveable
 x = zeros(length(diffmodel.var_ids));

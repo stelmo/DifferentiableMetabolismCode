@@ -2,16 +2,13 @@ using COBREXA, DifferentiableMetabolism
 using CPLEX, JSON, SparseArrays, Statistics, Serialization, SparseArrays, LinearAlgebra
 using DataFrames, DataFramesMeta, Chain, CSV, CairoMakie, ColorSchemes
 
-include(joinpath("analyses", "thermo.jl"))
-using .Thermo
+#: now find better estimates
+include(joinpath("analyses", "metabolite_estimates.jl"))
+using .MetaboliteEstimates
+using JuMP, KNITRO
 
-function plot_metablites(ref_cond)
+function get_metabolite_sensitivities(ref_cond)
     try
-        #: load growth rates
-        growth_df = DataFrame(
-            CSV.File(joinpath("results", "michaelis_menten_gecko", "crispr_growth.csv")),
-        )
-
         #: import model and data files
         base_load_path = joinpath("model_construction", "processed_models_files", "ecoli")
         model = load_model(StandardModel, joinpath(base_load_path, "iml1515_fixed.json"))
@@ -60,15 +57,12 @@ function plot_metablites(ref_cond)
         knockdown_df = flatten(knockdown_df, :Reaction)
 
         #: Get reference and KD ids 
-        # kd_cond = ref_cond * " + aTC"
         df = @subset knockdown_df begin
             :Target .== ref_cond
         end
         rid_kds = String.(strip.(df[!, :Reaction]))
 
-        μ_ref = first(growth_df[growth_df[!, :Condition].==ref_cond, :Growth])
-        # μ_ko = first(growth_df[growth_df[!, :Condition].==kd_cond, :Growth])
-        target_gene = first(knockdown_df[knockdown_df[!, :Target].==ref_cond, :Gene])
+        target_gene = String(first(knockdown_df[knockdown_df[!, :Target].==ref_cond, :Gene]))
 
         gm = make_gecko_model(
             model;
@@ -77,6 +71,33 @@ function plot_metablites(ref_cond)
             gene_product_molar_mass,
             gene_product_mass_group_bound,
         )
+
+        rfluxes_ref = flux_balance_analysis_dict(
+            gm,
+            CPLEX.Optimizer;
+            modifications = [
+                change_optimizer_attribute("CPXPARAM_Emphasis_Numerical", 1),
+                change_optimizer_attribute("CPX_PARAM_SCAIND", 1),
+                COBREXA.silence,
+            ],
+        )
+        μ_ref = rfluxes_ref["BIOMASS_Ec_iML1515_core_75p37M"]
+
+        opt_model = flux_balance_analysis(
+            gm,
+            CPLEX.Optimizer;
+            modifications = [
+                change_optimizer_attribute("CPXPARAM_Emphasis_Numerical", 1),
+                change_optimizer_attribute("CPX_PARAM_SCAIND", 1),
+                COBREXA.silence,
+                change_objective(target_gene; sense = COBREXA.MAX_SENSE),
+                change_constraint("BIOMASS_Ec_iML1515_core_75p37M"; lb = μ_ref, ub = 1000),
+            ],
+        )
+        rfluxes_ref = flux_dict(gm, opt_model)
+        gpconcs_ref = gene_product_dict(gm, opt_model)
+        tg_ref = gpconcs_ref[target_gene]
+        flux_summary(rfluxes_ref)
 
         opt_model = flux_balance_analysis(
             gm,
@@ -87,12 +108,12 @@ function plot_metablites(ref_cond)
                 COBREXA.silence,
                 change_objective(genes(gm); sense = COBREXA.MIN_SENSE),
                 change_constraint("BIOMASS_Ec_iML1515_core_75p37M"; lb = μ_ref, ub = 1000),
+                change_constraint(target_gene; lb = tg_ref, ub = 200_000),
             ],
         )
         rfluxes_ref = flux_dict(gm, opt_model)
         gpconcs_ref = gene_product_dict(gm, opt_model)
         flux_summary(rfluxes_ref)
-        # enzyme_mass_ref = gene_product_mass_group_dict(gm, opt_model)["uncategorized"]
 
         #: Get knockdown condition
         kd_factor = 5
@@ -119,6 +140,7 @@ function plot_metablites(ref_cond)
         )
         rfluxes_kd = flux_dict(gm_kd, opt_model)
         gpconcs_kd = gene_product_dict(gm_kd, opt_model)
+        flux_summary(rfluxes_kd)
 
         pmodel = prune_model(model, rfluxes_kd)
 
@@ -145,33 +167,22 @@ function plot_metablites(ref_cond)
             end
         end
 
-        del_list = [ # these reactions don't get a km because they are wildly different from brenda
-            "SUCDi"
-            "IGPDH"
-            "IG3PS"
-            "DHDPRy"
-            "DMPPS"
-            "IPDPS"
-            "DHDPS"
-            "ECOAH7"
-            "DHAD2"
-            "DHAD1"
-            "ACACT7r"
-            "MTHFR2"
-            "PERD"
-            "E4PD"
+        del_list = [ 
+            "ACOAD6f"
+            "ANPRT"
+            "CPPPGO"
+            "ACOAD5f"
+            "ACOAD3f"
             "DHORD2"
-            "MDH2"
-            "GLCDpp"
-            "ASPO3"
-            "CYTBO3_4pp"
-            "NADH16pp"
-            "FDH4pp"
-            "DHORD5"
-            "GLYCTO2"
-            "FRD2"
-            "MDH3"
-            "ASPO3"
+            "ACOAD7f"
+            "AHCYSNS"
+            "HACD2"
+            "HACD4"
+            "HACD7"
+            "HACD6"
+            "HACD1"
+            "HACD5"
+            "HACD3"
         ]
         delete!.(Ref(rid_km), del_list) # trial and error
 
@@ -230,7 +241,7 @@ function plot_metablites(ref_cond)
             end
         end
 
-        mmdf = Thermo.get_thermo_and_saturation_concentrations(
+        mmdf = MetaboliteEstimates.get_thermo_and_saturation_concentrations(
             pmodel,
             rid_dg0,
             km_concs,
@@ -243,6 +254,23 @@ function plot_metablites(ref_cond)
             concentration_ub = mid -> get(km_concs, mid, 0.1 / 10) * 10,
             ignore_reaction_ids = ["Htex", "H2Otex", "H2Otpp"],
             modifications = [COBREXA.silence],
+        )
+
+        minlims = MetaboliteEstimates.min_limitation(
+            pmodel,
+            rid_dg0,
+            rid_km,
+            mmdf.concentrations,
+            2.0,
+            optimizer_with_attributes(KNITRO.Optimizer,"honorbnds" => 1);
+            flux_solution = loopless_sol,
+            proton_ids = ["h_c", "h_e", "h_p"],
+            water_ids = ["h2o_c", "h2o_e", "h2o_p"],
+            concentration_lb = mid -> get(km_concs, mid, 1e-6) / 1000,
+            concentration_ub = mid -> get(km_concs, mid, 0.1 / 10) * 10,
+            ignore_reaction_ids = ["Htex", "H2Otex", "H2Otpp"],
+            modifications = [COBREXA.silence],
+            ignore_metabolite_ids = ["h_c", "h_e", "h_p", "h2o_c", "h2o_e", "h2o_p"],
         )
 
         #: Differentiate but take into account kinetics
@@ -275,10 +303,10 @@ function plot_metablites(ref_cond)
 
         diffmodel = with_parameters(
             pgm_kd,
-            rid_enzyme,
+            rid_enzyme;
             rid_dg0,
             rid_km,
-            mmdf.concentrations;
+            mid_concentration = minlims.concentrations,
             scale_equality = true,
             scale_inequality = true,
             ignore_reaction_ids = ["Htex", "H2Otex", "H2Otpp"],
@@ -302,6 +330,7 @@ function plot_metablites(ref_cond)
 
         #: Plot 
         rfs = Dict(fluxes(pgm_kd) .=> reaction_flux(pgm_kd)' * x)
+        flux_summary(rfs)
 
         biomass_idx = findfirst(startswith("BIOMASS_"), diffmodel.var_ids)
         conc_idxs = findall(startswith("c#"), diffmodel.param_ids)
@@ -315,6 +344,7 @@ function plot_metablites(ref_cond)
         for rid_kd in rid_kds
             if abs(get(rfs, rid_kd, 0)) > 0
                 for (k, v) in reaction_stoichiometry(pgm_kd, rid_kd)
+                    k in rmets && continue
                     if v * rfs[rid_kd] > 0 # product 
                         push!(rmets, k)
                         push!(rsubs, 0.0)
@@ -342,29 +372,77 @@ function plot_metablites(ref_cond)
             Product = prods,
         )
         CSV.write(
-            joinpath("analyses", "michaelis_menten_gecko", "results", ref_cond * ".csv"),
+            joinpath("results", "crispr", ref_cond * ".csv"),
             df,
         )
     catch err
         println("Error on: ", ref_cond)
+        println(err)
     end
 end
 
 targets = [
-    "purB"
-    "pyrF"
+    "adk"
     "aroA"
-    "purC"
-    "gnd"
-    "metE"
-    "eno" 
-    "cysH" 
-    "glmS"
-    "zwf"
+    "carA"
+    "cysH"
+    "dxs"
+    "eno"
+    "fbaA"
     "gapA"
+    "gdhA"
+    "glmS"
+    "gltA"
+    "gnd"
     "ilvC"
+    "metE"
+    "pck"
+    "pfkA"
+    "pfkB"
+    "pgi"
+    "ppc"
+    "prs"
+    "ptsH"
+    "purB"
+    "purC"
+    "pykA"
+    "pykF"
+    "pyrF"
+    "sdhC"
+    "tpiA"
+    "zwf"
 ]
 
 for target in targets
-    plot_metablites(target)
+    get_metabolite_sensitivities(target)
 end
+
+
+    #     del_list = [ # these reactions don't get a km because they are wildly different from brenda
+    #     "SUCDi"
+    #     "IGPDH"
+    #     "IG3PS"
+    #     "DHDPRy"
+    #     "DMPPS"
+    #     "IPDPS"
+    #     "DHDPS"
+    #     "ECOAH7"
+    #     "DHAD2"
+    #     "DHAD1"
+    #     "ACACT7r"
+    #     "MTHFR2"
+    #     "PERD"
+    #     "E4PD"
+    #     "DHORD2"
+    #     "MDH2"
+    #     "GLCDpp"
+    #     "ASPO3"
+    #     "CYTBO3_4pp"
+    #     "NADH16pp"
+    #     "FDH4pp"
+    #     "DHORD5"
+    #     "GLYCTO2"
+    #     "FRD2"
+    #     "MDH3"
+    #     "ASPO3"
+    # ]

@@ -1,20 +1,39 @@
 using ColorSchemes, CairoMakie, DataFrames, DataFramesMeta, Chain, CSV
 using Measurements, COBREXA
 
-dirs = [
+dirs = [ # order of paper
     "purB.csv"
     "pyrF.csv"
     "aroA.csv"
     "purC.csv"
+    "pts.csv"
+    "pfkA.csv"
     "gnd.csv"
     "metE.csv"
+    "sdh.csv"
+    "adk.csv"
     "eno.csv"
+    "pgi.csv"
     "cysH.csv"
+    "fbaA.csv"
+    "gdhA.csv"
+    "pykF.csv"
+    "tpiA.csv"
+    "gltA.csv"
     "glmS.csv"
     "zwf.csv"
+    "ppc.csv"
+    "carA.csv"
+    "dxs.csv"
     "gapA.csv"
+    "prs.csv"
     "ilvC.csv"
+    "pykA.csv"
+    "pfkB.csv"
+    "pck.csv"
 ]
+
+filter!(x -> x in readdir(joinpath("results", "crispr")), dirs)
 
 knockdown_df = transform(
     DataFrame(CSV.File(joinpath("data", "crispr", "target_gene.csv"))),
@@ -38,7 +57,7 @@ end
 
 #: Plot figure
 fig = Figure(
-    resolution = (1200, 600),
+    resolution = (1400, 600),
     backgroundcolor=:transparent,
 );
 
@@ -99,7 +118,6 @@ for (resi, res) in zip(1:3:length(dirs)*3, dirs)
         markersize = 5,
     )
 
-
     sub_xs = (resi - 0.25) .+ 0.01 .* randn(length(substrate_sens))
     scatter!(
         ax,
@@ -132,8 +150,8 @@ for (resi, res) in zip(1:3:length(dirs)*3, dirs)
     while has_changed
         has_changed = false
         for i = 1:length(mids)-1
-            if abs(midys[i+1] - midys[i]) < 0.03
-                midys[i] -= 0.03
+            if abs(midys[i+1] - midys[i]) < 0.05
+                midys[i] -= 0.05
                 has_changed = true
             end
         end
@@ -204,7 +222,7 @@ hidespines!(ax2)
 hidexdecorations!(ax2)
 hideydecorations!(ax2, label = false, ticklabels = false, ticks = false)
 ylims!(ax2, 2^-10, 2^10)
-ylims!(ax, -1.1, 1.1)
+ylims!(ax, -2.5, 2.5)
 linkxaxes!(ax, ax2)
 
 elem1 = [MarkerElement(color = ColorSchemes.Set2_6[1], marker = :rect, markersize = 10)]
@@ -225,7 +243,7 @@ Legend(
     patchsize = (10, 10),
     # rowgap = 10,
     margin = (10, 10, 10, 10),
-    halign = :left,
+    halign = :right,
     valign = :bottom,
     tellwidth = false,
     tellheight = false,

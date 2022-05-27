@@ -20,7 +20,8 @@ for df in groupby(dfr, :RIDS)
     if all(in.(ks, Ref(rs))) && all(in.(rs, Ref(ks)))
         d[rid] = td
     else
-        @warn("Missing metabolites for $rid")
+        mids = [setdiff(ks, rs); setdiff(rs, ks)]
+        @warn("Missing metabolites for $rid, $mids")
     end
 end
 
