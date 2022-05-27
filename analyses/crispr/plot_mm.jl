@@ -17,13 +17,13 @@ dirs = [ # order of paper
     "cysH.csv"
     "fbaA.csv"
     "gdhA.csv"
-    "pykF.csv"
+    # "pykF.csv" gene product not used in model
     "tpiA.csv"
     "gltA.csv"
     "glmS.csv"
     "zwf.csv"
     "ppc.csv"
-    "carA.csv"
+    # "carA.csv" gene product not used in model
     "dxs.csv"
     "gapA.csv"
     "prs.csv"
@@ -57,7 +57,7 @@ end
 
 #: Plot figure
 fig = Figure(
-    resolution = (1400, 600),
+    resolution = (1600, 600),
     backgroundcolor=:transparent,
 );
 
@@ -78,7 +78,7 @@ vlines!(ax, 1:3:(length(dirs)*3), color = ColorSchemes.Greys_9[3], linestyle = :
 
 fdir(x, y) = x == 1 ? -1 : y == 1 ? 1 : 0
 for (resi, res) in zip(1:3:length(dirs)*3, dirs)
-    # (resi, res) = first(zip(1:3:length(dirs)*3, dirs))
+
     df = DataFrame(CSV.File(joinpath("results", "crispr", res)))
     @transform!(
         df,
@@ -137,7 +137,8 @@ for (resi, res) in zip(1:3:length(dirs)*3, dirs)
         marker = :rect,
         markersize = 10,
     )
-
+    # don't show cofactors (clutter reduction)
+    # cofactors = ["nadp", "nad", "nadph", "atp", "adp", "co2", "3psme", ""]
     mids = [substrate_ids; product_ids]
     midys = [substrate_sens; product_sens]
     midxs = [sub_xs; prod_xs]
@@ -150,8 +151,8 @@ for (resi, res) in zip(1:3:length(dirs)*3, dirs)
     while has_changed
         has_changed = false
         for i = 1:length(mids)-1
-            if abs(midys[i+1] - midys[i]) < 0.05
-                midys[i] -= 0.05
+            if abs(midys[i+1] - midys[i]) < 0.09
+                midys[i] -= 0.09
                 has_changed = true
             end
         end
@@ -160,7 +161,7 @@ for (resi, res) in zip(1:3:length(dirs)*3, dirs)
         ax,
         mids;
         position = [Point2f(x, y) for (x, y) in zip(midxs, midys)],
-        textsize = 10.0,
+        textsize = 12.0,
         align = (:right, :baseline),
     )
 
@@ -202,14 +203,45 @@ for (resi, res) in zip(1:3:length(dirs)*3, dirs)
         markersize = 10,
         marker = :circle,
     )
+    # text!(
+    #     ax2,
+    #     mids[[prod_idxs; sub_idxs]];
+    #     position = [
+    #         Point2f(x, y) for
+    #         (x, y) in zip(xs[[prod_idxs; sub_idxs]], l2fc[[prod_idxs; sub_idxs]])
+    #     ],
+    #     textsize = 12.0,
+    #     align = (:left, :baseline),
+    # )
+
+    mids = mids[[prod_idxs; sub_idxs]]
+    midys = l2fc[[prod_idxs; sub_idxs]]
+    midxs = xs[[prod_idxs; sub_idxs]]
+
+    idxs = sortperm(midys)
+    mids = mids[idxs]
+    midys = midys[idxs]
+    midxs = midxs[idxs]
+    has_changed = true
+    if res == "pfkB.csv"
+        adj = 0.12
+    else
+        adj = 0.09
+    end
+    while has_changed
+        has_changed = false
+        for i = 1:length(mids)-1
+            if abs(midys[i+1] - midys[i]) < adj
+                midys[i] -= adj
+                has_changed = true
+            end
+        end
+    end
     text!(
         ax2,
-        mids[[prod_idxs; sub_idxs]];
-        position = [
-            Point2f(x, y) for
-            (x, y) in zip(xs[[prod_idxs; sub_idxs]], l2fc[[prod_idxs; sub_idxs]])
-        ],
-        textsize = 10.0,
+        mids;
+        position = [Point2f(x, y) for (x, y) in zip(midxs, midys)],
+        textsize = 12.0,
         align = (:left, :baseline),
     )
 end
@@ -244,13 +276,28 @@ Legend(
     # rowgap = 10,
     margin = (10, 10, 10, 10),
     halign = :right,
-    valign = :bottom,
+    valign = :top,
     tellwidth = false,
     tellheight = false,
     orientation = :horizontal,
     nbanks = 3,
 )
 
+substrate = Rect(0, -2.25, 26, 0.25)
+poly!(ax, substrate, color=ColorSchemes.Set3_4[1])
+text!(ax, "Substrate"; position=Point2f(11, -2.5))
+
+allosteric = Rect(27, -2.25, 2, 0.25)
+poly!(ax, allosteric, color=ColorSchemes.Set3_4[2])
+text!(ax, "Allosteric"; position=Point2f(26, -2.5))
+
+unclear = Rect(30, -2.25, 11, 0.25)
+poly!(ax, unclear, color=ColorSchemes.Set3_4[3])
+text!(ax, "Unclear"; position=Point2f(34, -2.5))
+
+nochange = Rect(42, -2.25, 8, 0.25)
+poly!(ax, nochange, color=ColorSchemes.Set3_4[4])
+text!(ax, "None"; position=Point2f(45, -2.5))
 
 fig
 
