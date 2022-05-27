@@ -353,15 +353,15 @@ end
 targets = [
     "purB"
     "pyrF"
-    "aroA" # works
+    "aroA"
     "purC"
     "gnd"
     "metE"
-    "eno" # works
-    "cysH" # works
+    "eno" 
+    "cysH" 
     "glmS"
     "zwf"
-    "gapA" # works
+    "gapA"
     "ilvC"
 ]
 
