@@ -1,5 +1,5 @@
 using COBREXA, DifferentiableMetabolism
-using CPLEX, JSON, SparseArrays, Statistics, Serialization
+using CPLEX, JSON, SparseArrays, Statistics
 using ArgParse
 
 if Sys.iswindows()
@@ -63,13 +63,14 @@ function main()
         (rid, isozyme_vec) in reaction_isozymes
     )
 
-    #: save model 
-    serialize(joinpath(savedir, "pgm.jls"), pgm)
-
     #: make differentiable model
     diffmodel =
         with_parameters(pgm, rid_enzyme; scale_equality = true, scale_inequality = true)
-    serialize(joinpath(savedir, "diffmodel.jls"), diffmodel)
+    
+    open(joinpath(savedir, "var_params.json"), "w") do io 
+        d = Dict("var_ids" => diffmodel.var_ids, "param_ids" => diffmodel.param_ids)
+        JSON.print(io, d)
+    end
 
     _Q, _c, loss_offset = SubgradientDescent.qp_objective_measured(
         reactions(pgm),

@@ -195,13 +195,14 @@ function qp_objective_measured(
     etol = 1e-3,
     reg = 1e-3,
 )
-    n_vars = length(gids) + length(rids)
+    n_vars = length(rids)
+    reaction_ids = filter(x -> x ∉ gids, rids)
     c = zeros(n_vars) #  linear component
     q = zeros(n_vars) #  quadratic component
     n = 0 # count number of loss variables
 
     # flux
-    for (i, rid) in enumerate(rids)
+    for (i, rid) in enumerate(reaction_ids)
         unmangled_rid = first(split(rid, "#"))
         if !haskey(obs_v_dict, unmangled_rid) || abs(obs_v_dict[unmangled_rid]) < vtol
             q[i] = reg
@@ -213,7 +214,7 @@ function qp_objective_measured(
     end
 
     # protein
-    k = length(rids)
+    k = length(reaction_ids)
     for (i, gid) in enumerate(gids)
         if !haskey(obs_e_dict, gid) || abs(obs_e_dict[gid]) < etol
             q[k+i] = reg
