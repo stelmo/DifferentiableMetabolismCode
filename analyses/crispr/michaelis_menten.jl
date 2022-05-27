@@ -7,7 +7,7 @@ include(joinpath("analyses", "metabolite_estimates.jl"))
 using .MetaboliteEstimates
 using JuMP, KNITRO
 
-function get_metabolite_sensitivities(ref_cond)
+function get_metabolite_sensitivities(ref_cond, biomass_relax=1.0)
     try
         #: import model and data files
         base_load_path = joinpath("model_construction", "processed_models_files", "ecoli")
@@ -37,13 +37,18 @@ function get_metabolite_sensitivities(ref_cond)
                 ) for i = 1:length(reaction_kcats[rid])
             ] for rid in keys(reaction_kcats)
         )
+
         for rid in keys(reaction_isozymes)
-            reaction_isozymes[rid] = [
-                argmax(
-                    smoment_isozyme_speed(x -> gene_product_molar_mass[x]),
-                    reaction_isozymes[rid],
-                ),
-            ]
+            if rid == "GLUDy" # the slower homohexamer is expressed! 
+                reaction_isozymes[rid] = [first(reaction_isozymes[rid])]
+            else
+                reaction_isozymes[rid] = [
+                    argmax(
+                        smoment_isozyme_speed(x -> gene_product_molar_mass[x]),
+                        reaction_isozymes[rid],
+                    ),
+                ]
+            end
         end
 
         gene_product_bounds(gid) = (0, 200_000.0)
@@ -61,7 +66,6 @@ function get_metabolite_sensitivities(ref_cond)
             :Target .== ref_cond
         end
         rid_kds = String.(strip.(df[!, :Reaction]))
-
         target_gene = String(first(knockdown_df[knockdown_df[!, :Target].==ref_cond, :Gene]))
 
         gm = make_gecko_model(
@@ -91,7 +95,7 @@ function get_metabolite_sensitivities(ref_cond)
                 change_optimizer_attribute("CPX_PARAM_SCAIND", 1),
                 COBREXA.silence,
                 change_objective(target_gene; sense = COBREXA.MAX_SENSE),
-                change_constraint("BIOMASS_Ec_iML1515_core_75p37M"; lb = μ_ref, ub = 1000),
+                change_constraint("BIOMASS_Ec_iML1515_core_75p37M"; lb = biomass_relax*μ_ref, ub = 1000),
             ],
         )
         rfluxes_ref = flux_dict(gm, opt_model)
@@ -107,18 +111,20 @@ function get_metabolite_sensitivities(ref_cond)
                 change_optimizer_attribute("CPX_PARAM_SCAIND", 1),
                 COBREXA.silence,
                 change_objective(genes(gm); sense = COBREXA.MIN_SENSE),
-                change_constraint("BIOMASS_Ec_iML1515_core_75p37M"; lb = μ_ref, ub = 1000),
+                change_constraint("BIOMASS_Ec_iML1515_core_75p37M"; lb = biomass_relax*μ_ref, ub = 1000),
                 change_constraint(target_gene; lb = tg_ref, ub = 200_000),
             ],
         )
         rfluxes_ref = flux_dict(gm, opt_model)
         gpconcs_ref = gene_product_dict(gm, opt_model)
         flux_summary(rfluxes_ref)
+        gpconcs_ref[target_gene]
 
         #: Get knockdown condition
         kd_factor = 5
+        target_gene_prot_req = gpconcs_ref[target_gene] / kd_factor
         gene_product_bounds_kd(x) =
-            x == target_gene ? (0.0, gpconcs_ref[x] / kd_factor) : (0.0, 200_000.0)
+            x == target_gene ? (target_gene_prot_req*0.75, target_gene_prot_req*1.25) : (0.0, 200_000.0)
         gene_product_mass_group_bound_kd = Dict("uncategorized" => 650_000.0) # more than enough, protein limitation limits everything
 
         gm_kd = make_gecko_model(
@@ -144,12 +150,32 @@ function get_metabolite_sensitivities(ref_cond)
 
         pmodel = prune_model(model, rfluxes_kd)
 
+        loopless_mods = [
+            add_loopless_constraints(), 
+            COBREXA.silence,
+        ]
+
+        # ensure reaction of interest is not lost
+        for rid_kd in rid_kds
+            fff = rfluxes_kd[rid_kd]
+            if fff > 1e-3
+                push!(
+                    loopless_mods,
+                    change_constraint(rid_kd; lb=0.9*fff, ub=1000)
+                )
+            elseif fff < -1e-3
+                push!(
+                    loopless_mods,
+                    change_constraint(rid_kd; lb=-1000, ub=0.9*fff)
+                )
+            end
+        end
+      
         loopless_sol = flux_balance_analysis_dict(
             pmodel,
             CPLEX.Optimizer;
-            modifications = [add_loopless_constraints(), COBREXA.silence],
+            modifications = loopless_mods,
         )
-
         pmodel = prune_model(pmodel, loopless_sol)
 
         #: load km data
@@ -418,31 +444,3 @@ for target in targets
 end
 
 
-    #     del_list = [ # these reactions don't get a km because they are wildly different from brenda
-    #     "SUCDi"
-    #     "IGPDH"
-    #     "IG3PS"
-    #     "DHDPRy"
-    #     "DMPPS"
-    #     "IPDPS"
-    #     "DHDPS"
-    #     "ECOAH7"
-    #     "DHAD2"
-    #     "DHAD1"
-    #     "ACACT7r"
-    #     "MTHFR2"
-    #     "PERD"
-    #     "E4PD"
-    #     "DHORD2"
-    #     "MDH2"
-    #     "GLCDpp"
-    #     "ASPO3"
-    #     "CYTBO3_4pp"
-    #     "NADH16pp"
-    #     "FDH4pp"
-    #     "DHORD5"
-    #     "GLYCTO2"
-    #     "FRD2"
-    #     "MDH3"
-    #     "ASPO3"
-    # ]
