@@ -26,7 +26,7 @@ dirs = [ # order of paper
     # "carA.csv" gene product not used in model
     "dxs.csv"
     "gapA.csv"
-    "prs.csv"
+    # "prs.csv" gene product not used in model
     "ilvC.csv"
     "pykA.csv"
     "pfkB.csv"
@@ -203,16 +203,6 @@ for (resi, res) in zip(1:3:length(dirs)*3, dirs)
         markersize = 10,
         marker = :circle,
     )
-    # text!(
-    #     ax2,
-    #     mids[[prod_idxs; sub_idxs]];
-    #     position = [
-    #         Point2f(x, y) for
-    #         (x, y) in zip(xs[[prod_idxs; sub_idxs]], l2fc[[prod_idxs; sub_idxs]])
-    #     ],
-    #     textsize = 12.0,
-    #     align = (:left, :baseline),
-    # )
 
     mids = mids[[prod_idxs; sub_idxs]]
     midys = l2fc[[prod_idxs; sub_idxs]]
@@ -291,13 +281,13 @@ allosteric = Rect(27, -2.25, 2, 0.25)
 poly!(ax, allosteric, color=ColorSchemes.Set3_4[2])
 text!(ax, "Allosteric"; position=Point2f(26, -2.5))
 
-unclear = Rect(30, -2.25, 11, 0.25)
+unclear = Rect(30, -2.25, 8, 0.25)
 poly!(ax, unclear, color=ColorSchemes.Set3_4[3])
-text!(ax, "Unclear"; position=Point2f(34, -2.5))
+text!(ax, "Unclear"; position=Point2f(33, -2.5))
 
-nochange = Rect(42, -2.25, 8, 0.25)
+nochange = Rect(39, -2.25, 8, 0.25)
 poly!(ax, nochange, color=ColorSchemes.Set3_4[4])
-text!(ax, "None"; position=Point2f(45, -2.5))
+text!(ax, "None"; position=Point2f(42, -2.5))
 
 fig
 
