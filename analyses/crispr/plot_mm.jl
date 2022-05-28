@@ -1,7 +1,7 @@
 using ColorSchemes, CairoMakie, DataFrames, DataFramesMeta, Chain, CSV
 using Measurements, COBREXA
 
-dirs = [ # order of paper, don't show some to reduce clutter, described in supplement
+dirs = [ # order of paper
     "purB.csv"
     "pyrF.csv"
     "aroA.csv"
@@ -23,11 +23,11 @@ dirs = [ # order of paper, don't show some to reduce clutter, described in suppl
     "glmS.csv"
     "zwf.csv"
     "ppc.csv"
-    # "carA.csv"
-    # "dxs.csv"
+    "carA.csv"
+    "dxs.csv"
     "gapA.csv"
-    # "prs.csv"
-    # "ilvC.csv"
+    "prs.csv"
+    "ilvC.csv"
     "pykA.csv"
     "pfkB.csv"
     "pck.csv"
@@ -281,9 +281,9 @@ substrate = Rect(0, -2.25, 32, 0.25)
 poly!(ax, substrate, color=ColorSchemes.Set3_4[1])
 text!(ax, "Substrate"; position=Point2f(14, -2.5))
 
-unclear = Rect(33, -2.25, 8, 0.25)
+unclear = Rect(33, -2.25, 14, 0.25)
 poly!(ax, unclear, color=ColorSchemes.Set3_4[4])
-text!(ax, "Other"; position=Point2f(36, -2.5))
+text!(ax, "Other"; position=Point2f(39, -2.5))
 
 
 fig
