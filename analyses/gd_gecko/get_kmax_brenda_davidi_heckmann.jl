@@ -25,24 +25,20 @@ for dir in params_dir
 end
 
 #: load brenda data
-brenda_df_raw =
-    DataFrame(CSV.File(joinpath("data", "kcats", "davidi2016", "brenda_kcats.csv")))
+davidi_df = DataFrame(CSV.File(joinpath("data", "kcats", "davidi2016", "brenda_kcats.csv")))
 rename!(
-    brenda_df_raw,
+    davidi_df,
     Dict(
-        "reaction (model name)" => :KcatID,
-        "kcat per active site [1/s]" => :kcatpa,
-        "catalytic sites per complex" => :ncat,
+        "ReactionID" => :KcatID,
     ),
 )
-brenda_df = @chain brenda_df_raw begin
-    @transform(:KcatID = "k#" .* first.(split.(:KcatID, "_")), :Kcat = :kcatpa .* :ncat)
+brenda_df = @chain davidi_df begin
+    @transform(:KcatID = "k#" .* first.(split.(:KcatID, "_")))
     @select(:KcatID, :Kcat)
 end
 
 #: load model
-model =
-    load_model(StandardModel, joinpath("model_construction", "model_files", "iML1515.json"))
+model = load_model(StandardModel, joinpath("model_construction", "model_files", "iML1515.json"))
 subsys_df = DataFrame(
     KcatID = "k#" .* reactions(model),
     Subsystem = [model.reactions[rid].subsystem for rid in reactions(model)],
@@ -103,3 +99,14 @@ kmax_brenda_df = innerjoin(kmax_overall_df, brenda_df, on = :KcatID)
 kmax_brenda_df = innerjoin(kmax_brenda_df, subsys_df, on = :KcatID)
 
 CSV.write(joinpath("results", "gd_gecko", "kmax_brenda_df.csv"), kmax_brenda_df)
+CSV.write(joinpath("results", "gd_gecko", "davidi_df.csv"), davidi_df)
+
+base_load_path = joinpath("model_construction", "processed_models_files", "ecoli")
+reaction_kcats = JSON.parsefile(joinpath(base_load_path, "reaction_kcats.json"))
+rids = collect(keys(reaction_kcats))
+heck = [first(vs)[1] for vs in values(reaction_kcats)] .* 1/3600 * 1e6
+CSV.write(joinpath("results", "gd_gecko", "heckmann_df.csv"), 
+    DataFrame(KcatID=rids,Kmax=heck),
+)
+
+

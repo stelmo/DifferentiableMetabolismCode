@@ -1,64 +1,49 @@
-using ColorSchemes, CairoMakie, DataFrames, DataFramesMeta, Chain, CSV, Statistics
+using ColorSchemes, CairoMakie, DataFrames, DataFramesMeta, Chain, CSV, Statistics, COBREXA
+const notnan(x) = !isnan(x)
 
-df = DataFrame(CSV.File(joinpath("results", "gecko", "variability_sensitivities2.csv")))
-
-
-enzymes = [
-    "ATPS4rpp"
-    "GLUDy"
-    "CYTBO3_4pp"
-    "GAPD"
-    "PFK"
-    "PGM"
-    "PPS"
-    "TPI"
-    "PGK"
-    "FBA"
-    "PGI"
-    "ENO"
-]
-
-rdf = @subset df @byrow begin 
-    :Reaction in enzymes
+model = load_model(StandardModel, joinpath("model_construction", "model_files", "iML1515.json"))
+rid_subsystem = Dict{String, String}()
+for rid in reactions(model)
+    rid_subsystem[rid] = reaction_subsystem(model, rid)
 end
+
+df = DataFrame(CSV.File(joinpath("results", "gecko", "variability_sensitivities.csv")))
+
+@subset! df begin 
+    abs.(:Sensitivity) .> 1e-3
+end
+
+sdf = @combine groupby(df, :Parameter) begin 
+    :Mean = mean(:Sensitivity)
+    :Std = std(:Sensitivity)
+    :StdMean = abs(std(:Sensitivity)/mean(:Sensitivity))
+end
+
+@subset! sdf begin 
+    notnan.(:StdMean)
+end
+
+@rtransform! sdf begin
+    :Subsystem = rid_subsystem[:Parameter]
+end
+
+ssdf = @combine groupby(sdf, :Subsystem) begin 
+    :StdMean = mean(:StdMean)
+    :StdStd = std(:StdMean)
+end
+
+@subset! ssdf begin 
+    notnan.(:StdStd)
+end
+
+describe(ssdf)
 
 fig = Figure();
 ax = Axis(
     fig[1, 1], 
-    # yticks = ((1:12) ./ 4,  reverse(months)),
     # yscale=log10,
 );
 
-for (i, enzyme) in enumerate(enzymes)
-    rrdf = @subset rdf @byrow begin 
-        :Reaction == enzyme
-    end 
-    x = rrdf[!, :Sensitivity]
-    d = density!(
-        ax, 
-        x.*1_000, 
-        offset = i,
-        color = :x, 
-        # colormap = :thermal, 
-        # colorrange = (-5, 5),
-        # strokewidth = 1, 
-        # strokecolor = :black,
-    )
-end
+density!(sdf[!, :Std])
+
 fig
-
-mean(x)
-std(x)
-
-rrdf = @subset rdf @byrow begin 
-    :Reaction == "FBA"
-end 
-x = rrdf[!, :Sensitivity]
-d = density(
-    x.*10000, 
-    color = :x, 
-    # colormap = :thermal, 
-    # colorrange = (-5, 5),
-    # strokewidth = 1, 
-    # strokecolor = :black,
-)
