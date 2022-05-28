@@ -94,6 +94,7 @@ subsys_df = innerjoin(subsys_df, df_sys_map, on = :Subsystem)
 #: find kmax overall
 kmax_overall_df = combine(groupby(kmax_df, :KcatID), :Kmax => maximum => :Kmax)
 @transform!(kmax_overall_df, :Kmax = 1 / (3600 * 1e-6) .* :Kmax)
+CSV.write(joinpath("results", "gd_gecko", "polish_kmaxs_df.csv"), kmax_overall_df)
 
 kmax_brenda_df = innerjoin(kmax_overall_df, brenda_df, on = :KcatID)
 kmax_brenda_df = innerjoin(kmax_brenda_df, subsys_df, on = :KcatID)

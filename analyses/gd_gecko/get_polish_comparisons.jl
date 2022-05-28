@@ -83,7 +83,7 @@ function run_model(
     m, n = size(stoichiometry(model))
     xl, xu = bounds(model)
 
-    n_rxns = length(reactions(model))
+    n_rxns = n_reactions(model) - n_genes(model)
     R = reaction_flux(model)[1:n_rxns, :]
     F = fluxes(model)
     fvals = [first(get(measured_fluxes, x, [missing])) for x in F]
@@ -179,15 +179,16 @@ for master_id in master_ids
         delete!.(Ref(condition_reaction_isozymes), master_kos[ko_id])
     end
 
-    gene_product_mass_group_bound = Dict("uncategorized" => protein_upper_bound[master_id])
+    # gene_product_mass_group_bound = Dict("uncategorized" => protein_upper_bound[master_id])
+    gene_product_mass_group_bound = Dict("uncategorized" => 320_000.0) # use the constraint they use in paper! 
 
     #: modifications for solver
-    modifications = [
-        change_optimizer_attribute("CPXPARAM_Emphasis_Numerical", 1),
-        change_optimizer_attribute("CPX_PARAM_SCAIND", 1),
-        change_optimizer_attribute("CPX_PARAM_THREADS", 1),
-        # COBREXA.silence,
-    ]
+    # modifications = [
+    #     change_optimizer_attribute("CPXPARAM_Emphasis_Numerical", 1),
+    #     change_optimizer_attribute("CPX_PARAM_SCAIND", 1),
+    #     change_optimizer_attribute("CPX_PARAM_THREADS", 1),
+    #     # COBREXA.silence,
+    # ]
 
     modifications = [change_optimizer_attribute("NumericFocus", 3), COBREXA.silence]
 
