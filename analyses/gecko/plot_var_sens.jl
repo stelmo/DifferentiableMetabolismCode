@@ -21,7 +21,17 @@ end
 
 @subset! sdf begin 
     notnan.(:StdMean)
+    :StdMean .> 1e-3
 end
+
+fig = Figure();
+ax = Axis(
+    fig[1, 1], 
+);
+
+density!(sdf[!, :StdMean])
+fig
+
 
 @rtransform! sdf begin
     :Subsystem = rid_subsystem[:Parameter]
@@ -41,9 +51,8 @@ describe(ssdf)
 fig = Figure();
 ax = Axis(
     fig[1, 1], 
-    # yscale=log10,
 );
 
-density!(sdf[!, :Std])
+density!(ssdf[!, :StdMean])
 
 fig
