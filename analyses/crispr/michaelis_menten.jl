@@ -7,7 +7,7 @@ include(joinpath("analyses", "metabolite_estimates.jl"))
 using .MetaboliteEstimates
 using JuMP, KNITRO
 
-function get_metabolite_sensitivities(ref_cond, biomass_relax=1.0)
+function get_metabolite_sensitivities(ref_cond)
     try
         #: import model and data files
         base_load_path = joinpath("model_construction", "processed_models_files", "ecoli")
@@ -95,12 +95,43 @@ function get_metabolite_sensitivities(ref_cond, biomass_relax=1.0)
                 change_optimizer_attribute("CPX_PARAM_SCAIND", 1),
                 COBREXA.silence,
                 change_objective(target_gene; sense = COBREXA.MAX_SENSE),
-                change_constraint("BIOMASS_Ec_iML1515_core_75p37M"; lb = biomass_relax*μ_ref, ub = 1000),
+                change_constraint("BIOMASS_Ec_iML1515_core_75p37M"; lb = μ_ref, ub = 1000),
             ],
         )
         rfluxes_ref = flux_dict(gm, opt_model)
         gpconcs_ref = gene_product_dict(gm, opt_model)
         tg_ref = gpconcs_ref[target_gene]
+        if tg_ref < 1 # need to actually use gene
+            biomass_relax = 0.5 
+
+            rfluxes_ref = flux_balance_analysis_dict(
+                gm,
+                CPLEX.Optimizer;
+                modifications = [
+                    change_optimizer_attribute("CPXPARAM_Emphasis_Numerical", 1),
+                    change_optimizer_attribute("CPX_PARAM_SCAIND", 1),
+                    COBREXA.silence,
+                ],
+            )
+            μ_ref = rfluxes_ref["BIOMASS_Ec_iML1515_core_75p37M"]
+    
+            opt_model = flux_balance_analysis(
+                gm,
+                CPLEX.Optimizer;
+                modifications = [
+                    change_optimizer_attribute("CPXPARAM_Emphasis_Numerical", 1),
+                    change_optimizer_attribute("CPX_PARAM_SCAIND", 1),
+                    COBREXA.silence,
+                    change_objective(target_gene; sense = COBREXA.MAX_SENSE),
+                    change_constraint("BIOMASS_Ec_iML1515_core_75p37M"; lb = biomass_relax*μ_ref, ub = 1000),
+                ],
+            )
+            rfluxes_ref = flux_dict(gm, opt_model)
+            gpconcs_ref = gene_product_dict(gm, opt_model)
+            tg_ref = gpconcs_ref[target_gene]
+        else
+            biomass_relax = 1.0
+        end
         flux_summary(rfluxes_ref)
 
         opt_model = flux_balance_analysis(
@@ -299,6 +330,51 @@ function get_metabolite_sensitivities(ref_cond, biomass_relax=1.0)
             ignore_metabolite_ids = ["h_c", "h_e", "h_p", "h2o_c", "h2o_e", "h2o_p"],
         )
 
+        #: get rid_enzyme 
+
+        rid_enzyme = Dict(
+            rid => isozyme_to_enzyme(first(isozyme_vec), gene_product_molar_mass) for
+            (rid, isozyme_vec) in reaction_isozymes
+        )
+
+        #: Differentiate to get reference growth rate 
+        pgm_nokd = make_gecko_model(
+            pmodel;
+            reaction_isozymes,
+            gene_product_bounds = gene_product_bounds,
+            gene_product_molar_mass,
+            gene_product_mass_group_bound = gene_product_mass_group_bound,
+        )
+
+        diffmodel = with_parameters(
+            pgm_nokd,
+            rid_enzyme;
+            rid_dg0,
+            rid_km,
+            mid_concentration = minlims.concentrations,
+            scale_equality = true,
+            scale_inequality = true,
+            ignore_reaction_ids = ["Htex", "H2Otex", "H2Otpp"],
+            ignore_metabolite_ids = ["h2o_c", "h2o_e", "h2o_p", "h_c", "h_e", "h_p"],
+        )
+
+        nvars = length(diffmodel.c(diffmodel.θ))
+        update_Q!(diffmodel, x -> spdiagm(1e-9 .* ones(nvars))) # make sure can differentiate
+
+        x, dx = differentiate(
+            diffmodel,
+            CPLEX.Optimizer;
+            modifications = [
+                change_optimizer_attribute("CPXPARAM_Emphasis_Numerical", 1),
+                change_optimizer_attribute("CPX_PARAM_SCAIND", 1),
+                COBREXA.silence,
+            ],
+            use_analytic = false,
+            scale_output = true,
+        )
+        nokdrfs = Dict(fluxes(pgm_nokd) .=> reaction_flux(pgm_nokd)' * x)
+        flux_summary(nokdrfs)
+
         #: Differentiate but take into account kinetics
         pgm_kd = make_gecko_model(
             pmodel;
@@ -321,11 +397,6 @@ function get_metabolite_sensitivities(ref_cond, biomass_relax=1.0)
         rfluxes_kd = flux_dict(pgm_kd, opt_model)
         gpconcs_kd = gene_product_dict(pgm_kd, opt_model)
         flux_summary(rfluxes_kd)
-
-        rid_enzyme = Dict(
-            rid => isozyme_to_enzyme(first(isozyme_vec), gene_product_molar_mass) for
-            (rid, isozyme_vec) in reaction_isozymes
-        )
 
         diffmodel = with_parameters(
             pgm_kd,
@@ -391,11 +462,15 @@ function get_metabolite_sensitivities(ref_cond, biomass_relax=1.0)
         sens = [conc_sens[met_idxs]; conc_sens[big_idxs]]
         subs = [rsubs; fill(0.0, length(big_idxs))]
         prods = [rprods; fill(0.0, length(big_idxs))]
+        kd_growth = fill(rfs["BIOMASS_Ec_iML1515_core_75p37M"], length(subs))
+        ref_growth = fill(nokdrfs["BIOMASS_Ec_iML1515_core_75p37M"], length(subs))
         df = DataFrame(
             Metabolite = mids,
             Sensitivity = sens,
             Substrate = subs,
             Product = prods,
+            RefGrowth = ref_growth,
+            KDGrowth = kd_growth,
         )
         CSV.write(
             joinpath("results", "crispr", ref_cond * ".csv"),

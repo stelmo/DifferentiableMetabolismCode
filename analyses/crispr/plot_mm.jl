@@ -54,6 +54,7 @@ for mid in metabolites(model)
         kegg_mid_lu[kegg] = mid[1:end-2]
     end
 end
+kegg_mid_lu["C01094"] = "g6p"
 
 #: Plot figure
 fig = Figure(
@@ -95,6 +96,9 @@ for (resi, res) in zip(1:3:length(dirs)*3, dirs)
         :Metabolite .!= "h_e"
         :Metabolite .!= "pi_e"
         :Metabolite .!= "h2o_e"
+        :Metabolite .!= "co2_c"
+        :Metabolite .!= "co2_p"
+        :Metabolite .!= "co2_e"
     end
 
     sub_df = unique(@subset(df, :SubOrProdorNot .== -1), :Metabolite)
@@ -277,17 +281,10 @@ substrate = Rect(0, -2.25, 26, 0.25)
 poly!(ax, substrate, color=ColorSchemes.Set3_4[1])
 text!(ax, "Substrate"; position=Point2f(11, -2.5))
 
-allosteric = Rect(27, -2.25, 2, 0.25)
-poly!(ax, allosteric, color=ColorSchemes.Set3_4[2])
-text!(ax, "Allosteric"; position=Point2f(26, -2.5))
+unclear = Rect(27, -2.25, 14, 0.25)
+poly!(ax, unclear, color=ColorSchemes.Set3_4[4])
+text!(ax, "Other"; position=Point2f(33, -2.5))
 
-unclear = Rect(30, -2.25, 8, 0.25)
-poly!(ax, unclear, color=ColorSchemes.Set3_4[3])
-text!(ax, "Unclear"; position=Point2f(33, -2.5))
-
-nochange = Rect(39, -2.25, 8, 0.25)
-poly!(ax, nochange, color=ColorSchemes.Set3_4[4])
-text!(ax, "None"; position=Point2f(42, -2.5))
 
 fig
 

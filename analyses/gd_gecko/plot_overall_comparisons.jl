@@ -27,7 +27,7 @@ barplot!(
     hold_ax,
     1:length(xlabs),
     Measurements.value.(frac_improv),
-    color = ColorSchemes.Dark2_3[1],
+    color = ColorSchemes.Set2_3[1],
 )
 
 errorbars!(
@@ -49,7 +49,7 @@ kb = kmax_brenda_df[!, :Kcat]
 kgd = kmax_brenda_df[!, :Kmax]
 usubs = unique(kmax_brenda_df[!, :SubID]) # unique subsystems
 kss = [
-    ColorSchemes.Dark2_6[findfirst(x -> x == id, usubs)] for id in kmax_brenda_df[!, :SubID]
+    ColorSchemes.Set2_6[findfirst(x -> x == id, usubs)] for id in kmax_brenda_df[!, :SubID]
 ]
 
 brenda_ax = Axis(
@@ -71,7 +71,7 @@ hideydecorations!(brenda_ax, label = false, ticklabels = false, ticks = false)
 
 elms = [
     MarkerElement(
-        color = ColorSchemes.Dark2_6[findfirst(x -> x == id, usubs)],
+        color = ColorSchemes.Set2_6[findfirst(x -> x == id, usubs)],
         marker = '●',
         markersize = 15,
     ) for id in usubs
