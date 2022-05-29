@@ -1,5 +1,5 @@
 using ColorSchemes, CairoMakie, DataFrames, DataFramesMeta, Chain, CSV
-using Measurements
+using Measurements, COBREXA
 
 davidi_df = DataFrame(CSV.File(joinpath("results", "gd_gecko", "davidi_df.csv")))
 heckmann_df = DataFrame(CSV.File(joinpath("results", "gd_gecko", "heckmann_df.csv")))
@@ -66,13 +66,13 @@ _rid_subsystem(x) = get(rid_subsystem, x, "Other")
 
 #: Plot figure
 fig = Figure(
-    resolution = (1000, 3000)
+    resolution = (1200, 1200)
     # backgroundcolor = :transparent,
 );
 
 ga = fig[1, 1] = GridLayout()
-gb = fig[2, 1] = GridLayout()
-gc = fig[3, 1] = GridLayout()
+gb = fig[1, 2] = GridLayout()
+gc = fig[2, 1] = GridLayout()
 
 lb = 10^-2
 ub = 10^4
@@ -218,12 +218,6 @@ Legend(
     margin = (10, 10, 10, 10),
 )
 
-
-
-
-
-
-
 for (label, layout) in zip(["A", "B", "C"], [ga, gb, gc])
     Label(
         layout[1, 1, TopLeft()],
@@ -234,9 +228,6 @@ for (label, layout) in zip(["A", "B", "C"], [ga, gb, gc])
     )
 end
 
-
-
 fig
 
-
-# CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "imgs", "kmax_comparison.pdf"), fig)
+CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "imgs", "kmax_brenda_davidi_heckmann.pdf"), fig)

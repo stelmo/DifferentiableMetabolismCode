@@ -103,7 +103,6 @@ end
 fig
 CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "imgs", "kmax_comparison.pdf"), fig)
 
-
 using GLM
 df = DataFrame(Y = log10.(kb), X = log10.(kgd))
 f = lm(@formula(Y ~ X), df)
