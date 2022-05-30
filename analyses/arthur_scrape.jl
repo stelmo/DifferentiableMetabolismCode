@@ -1,11 +1,11 @@
-using JSON, DataFrames, DifferentiableMetabolism, COBREXA, Serialization, CSV
+using JSON, DataFrames, DifferentiableMetabolism, COBREXA, CSV
 
 function get_data_out_as_df(results_dir, save_dir)
     results_name = last(split(results_dir, "/"))
     files = filter(startswith("iter_"), readdir(joinpath(results_dir)))
-    diffmodel = deserialize(joinpath(results_dir, "diffmodel.jls"))
+    diffmodel = JSON.parsefile(joinpath(results_dir, "var_params.json"))
 
-    param_ids = diffmodel.param_ids
+    param_ids = diffmodel["param_ids"]
     n_params = length(param_ids)
     n_files = length(files)
 
