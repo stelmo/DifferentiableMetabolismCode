@@ -1,7 +1,7 @@
 using JSON,
     ColorSchemes, CairoMakie, DataFrames, DataFramesMeta, Chain, CSV, COBREXA, Statistics
 
-rdir = "linesearch"
+rdir = "linesearch_new"
 losses_dir = filter(endswith("losses.csv"), readdir(joinpath("results", rdir)))
 params_dir = filter(endswith("params.csv"), readdir(joinpath("results", rdir)))
 

@@ -40,152 +40,179 @@ gm = make_gecko_model(
 )
 
 opt_model = flux_balance_analysis(gm, CPLEX.Optimizer)
-rfluxes = flux_dict(gm, opt_model)
+fluxes = flux_dict(gm, opt_model)
 gpconcs = gene_product_dict(gm, opt_model)
 
-pmodel = prune_model(model, rfluxes)
 
-#: construct a pruned GeckoModel
-reaction_isozyme = Dict{String,Vector{Isozyme}}()
-for rid in reactions(pmodel)
-    for isozyme in get(reaction_isozymes, rid, [])
-        if all([get(gpconcs, gid, 0.0) for gid in keys(isozyme.gene_product_count)] .> 0)
-            reaction_isozyme[rid] = [isozyme]
-            break
+fig = Figure(resolution = (1000, 1000), backgroundcolor = :transparent);
+
+reaction_mass = Dict{String,Float64}()
+for (k, v) in fluxes
+    !startswith(k, "b") && continue
+    for (rid, enzyme) in reaction_isozymes
+        if k in keys(enzyme.gene_product_count)
+            reaction_mass[rid] = get(reaction_mass, rid, 0.0) + v
         end
     end
 end
 
-pgm = make_gecko_model(
-    pmodel;
-    reaction_isozymes = reaction_isozyme,
-    gene_product_bounds,
-    gene_product_molar_mass,
-    gene_product_mass_group_bound,
-)
-
-opt_model = flux_balance_analysis(pgm, CPLEX.Optimizer)
-rfluxes = flux_dict(pgm, opt_model)
-gpconcs = gene_product_dict(pgm, opt_model)
-
-#: differentiate model
-rid_enzyme = Dict(
-    rid => isozyme_to_enzyme(first(isozyme_vec), gene_product_molar_mass) for
-    (rid, isozyme_vec) in reaction_isozyme
-)
-
-diffmodel = with_parameters(pgm, rid_enzyme)
-
-x, _dx = differentiate(diffmodel, CPLEX.Optimizer)
-dx = _dx[1:length(diffmodel.var_ids), :]
-
-#: plot results
-include(joinpath("analyses", "visualize.jl"))
-using .Visualize
-
-#: Plot fluxes
-fig = Figure(
-    resolution = (1000, 1000),
-    # backgroundcolor=:transparent,
-);
-
-heatmap_ax = Axis(fig[1, 1], xticklabelrotation = -pi / 2);
-
-Visualize.plot_heatmap(
-    diffmodel,
-    dx,
-    heatmap_ax,
-    fig[1, 2];
-    ignore_vids = filter(startswith("b"), diffmodel.var_ids),
-    ignore_pids = [],
-    n_σ = 1.0,
-    atol = 1e-6,
+Visualize.plot_escher_viz(
+    Axis(fig[1, 1]),
+    fig[1, 2],
+    rids,
+    fluxes,
+    reaction_mass,
+    joinpath("data", "maps", "simplified_core_iml1515_map.json"),
 )
 fig
+CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "imgs", "gecko_map_iml1515.pdf"), fig)
 
-#: Plot gene products
-fig = Figure(
-    resolution = (1000, 1000),
-    # backgroundcolor=:transparent,
-);
+# rfluxes = flux_dict(gm, opt_model)
+# gpconcs = gene_product_dict(gm, opt_model)
 
-heatmap_ax = Axis(fig[1, 1], xticklabelrotation = -pi / 2);
+# pmodel = prune_model(model, rfluxes)
 
-Visualize.plot_heatmap(
-    diffmodel,
-    dx,
-    heatmap_ax,
-    fig[1, 2];
-    ignore_vids = filter(!startswith("b"), diffmodel.var_ids),
-    ignore_pids = [],
-    n_σ = 1.0,
-    atol = 1e-6,
-)
-fig
+# #: construct a pruned GeckoModel
+# reaction_isozyme = Dict{String,Vector{Isozyme}}()
+# for rid in reactions(pmodel)
+#     for isozyme in get(reaction_isozymes, rid, [])
+#         if all([get(gpconcs, gid, 0.0) for gid in keys(isozyme.gene_product_count)] .> 0)
+#             reaction_isozyme[rid] = [isozyme]
+#             break
+#         end
+#     end
+# end
 
-#! compare to flux control coefficients
-fcc = Dict()
-for rid in keys(reaction_isozyme)
+# pgm = make_gecko_model(
+#     pmodel;
+#     reaction_isozymes = reaction_isozyme,
+#     gene_product_bounds,
+#     gene_product_molar_mass,
+#     gene_product_mass_group_bound,
+# )
 
-    original_isozyme = first(reaction_isozyme[rid])
+# opt_model = flux_balance_analysis(pgm, CPLEX.Optimizer)
+# rfluxes = flux_dict(pgm, opt_model)
+# gpconcs = gene_product_dict(pgm, opt_model)
 
-    new_isozyme = Isozyme(
-        original_isozyme.gene_product_count,
-        1.001 * original_isozyme.kcat_forward,
-        1.001 * original_isozyme.kcat_reverse,
-    )
+# #: differentiate model
+# rid_enzyme = Dict(
+#     rid => isozyme_to_enzyme(first(isozyme_vec), gene_product_molar_mass) for
+#     (rid, isozyme_vec) in reaction_isozyme
+# )
 
-    reaction_isozyme[rid] = [new_isozyme]
+# diffmodel = with_parameters(pgm, rid_enzyme)
 
-    pgm = make_gecko_model(
-        pmodel;
-        reaction_isozymes = reaction_isozyme,
-        gene_product_bounds,
-        gene_product_molar_mass,
-        gene_product_mass_group_bound,
-    )
+# x, _dx = differentiate(diffmodel, CPLEX.Optimizer)
+# dx = _dx[1:length(diffmodel.var_ids), :]
 
-    opt_model = flux_balance_analysis(pgm, CPLEX.Optimizer)
-    rfluxes = flux_dict(pgm, opt_model)
-    gpconcs = gene_product_dict(pgm, opt_model)
+# #: plot results
+# include(joinpath("analyses", "visualize.jl"))
+# using .Visualize
 
-    fcc[rid] = (rfluxes, gpconcs)
+# #: Plot fluxes
+# fig = Figure(
+#     resolution = (1000, 1000),
+#     # backgroundcolor=:transparent,
+# );
 
-    reaction_isozyme[rid] = [original_isozyme]
-end
+# heatmap_ax = Axis(fig[1, 1], xticklabelrotation = -pi / 2);
 
-pgm = make_gecko_model(
-    pmodel;
-    reaction_isozymes = reaction_isozyme,
-    gene_product_bounds,
-    gene_product_molar_mass,
-    gene_product_mass_group_bound,
-)
+# Visualize.plot_heatmap(
+#     diffmodel,
+#     dx,
+#     heatmap_ax,
+#     fig[1, 2];
+#     ignore_vids = filter(startswith("b"), diffmodel.var_ids),
+#     ignore_pids = [],
+#     n_σ = 1.0,
+#     atol = 1e-6,
+# )
+# fig
 
-opt_model = flux_balance_analysis(pgm, CPLEX.Optimizer)
-rfluxes = flux_dict(pgm, opt_model)
-gpconcs = gene_product_dict(pgm, opt_model)
+# #: Plot gene products
+# fig = Figure(
+#     resolution = (1000, 1000),
+#     # backgroundcolor=:transparent,
+# );
 
-fcc_dx = similar(dx)
-for (i, pid) in enumerate(diffmodel.param_ids)
-    base_param_id = last(split(pid, "#"))
-    f, g = fcc[base_param_id]
-    vids = [first(split(x, "#")) for x in diffmodel.var_ids]
-    fvec = [-1000.0 * (1.0 - f[k] / rfluxes[k]) for k in filter(!startswith("b"), vids)]
-    gvec = [-1000.0 * (1.0 - g[k] / gpconcs[k]) for k in filter(startswith("b"), vids)]
+# heatmap_ax = Axis(fig[1, 1], xticklabelrotation = -pi / 2);
 
-    fcc_dx[:, i] .= [fvec; gvec]
-end
+# Visualize.plot_heatmap(
+#     diffmodel,
+#     dx,
+#     heatmap_ax,
+#     fig[1, 2];
+#     ignore_vids = filter(!startswith("b"), diffmodel.var_ids),
+#     ignore_pids = [],
+#     n_σ = 1.0,
+#     atol = 1e-6,
+# )
+# fig
 
-fig = Figure(
-    resolution = (1000, 1000),
-    # backgroundcolor=:transparent,
-);
+# #! compare to flux control coefficients
+# fcc = Dict()
+# for rid in keys(reaction_isozyme)
 
-ax = Axis(fig[1, 1], xlabel = "FCC", ylabel = "MCA");
+#     original_isozyme = first(reaction_isozyme[rid])
 
-scatter!(ax, vec(fcc_dx), vec(dx))
+#     new_isozyme = Isozyme(
+#         original_isozyme.gene_product_count,
+#         1.001 * original_isozyme.kcat_forward,
+#         1.001 * original_isozyme.kcat_reverse,
+#     )
 
-hidexdecorations!(ax, ticks = false, ticklabels = false, label = false)
-hideydecorations!(ax, ticks = false, ticklabels = false, label = false)
-fig
+#     reaction_isozyme[rid] = [new_isozyme]
+
+#     pgm = make_gecko_model(
+#         pmodel;
+#         reaction_isozymes = reaction_isozyme,
+#         gene_product_bounds,
+#         gene_product_molar_mass,
+#         gene_product_mass_group_bound,
+#     )
+
+#     opt_model = flux_balance_analysis(pgm, CPLEX.Optimizer)
+#     rfluxes = flux_dict(pgm, opt_model)
+#     gpconcs = gene_product_dict(pgm, opt_model)
+
+#     fcc[rid] = (rfluxes, gpconcs)
+
+#     reaction_isozyme[rid] = [original_isozyme]
+# end
+
+# pgm = make_gecko_model(
+#     pmodel;
+#     reaction_isozymes = reaction_isozyme,
+#     gene_product_bounds,
+#     gene_product_molar_mass,
+#     gene_product_mass_group_bound,
+# )
+
+# opt_model = flux_balance_analysis(pgm, CPLEX.Optimizer)
+# rfluxes = flux_dict(pgm, opt_model)
+# gpconcs = gene_product_dict(pgm, opt_model)
+
+# fcc_dx = similar(dx)
+# for (i, pid) in enumerate(diffmodel.param_ids)
+#     base_param_id = last(split(pid, "#"))
+#     f, g = fcc[base_param_id]
+#     vids = [first(split(x, "#")) for x in diffmodel.var_ids]
+#     fvec = [-1000.0 * (1.0 - f[k] / rfluxes[k]) for k in filter(!startswith("b"), vids)]
+#     gvec = [-1000.0 * (1.0 - g[k] / gpconcs[k]) for k in filter(startswith("b"), vids)]
+
+#     fcc_dx[:, i] .= [fvec; gvec]
+# end
+
+# fig = Figure(
+#     resolution = (1000, 1000),
+#     # backgroundcolor=:transparent,
+# );
+
+# ax = Axis(fig[1, 1], xlabel = "FCC", ylabel = "MCA");
+
+# scatter!(ax, vec(fcc_dx), vec(dx))
+
+# hidexdecorations!(ax, ticks = false, ticklabels = false, label = false)
+# hideydecorations!(ax, ticks = false, ticklabels = false, label = false)
+# fig
