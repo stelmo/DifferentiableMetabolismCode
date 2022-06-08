@@ -27,3 +27,5 @@ Manifest.toml
 
 # these files are too big, need to run the scripts yourself
 results/gecko
+results/linesearch
+results/linesearch_new
