@@ -52,7 +52,7 @@ kegg_mid_lu["C01094"] = "g6p"
 
 #: Plot figure
 fig = Figure(
-    resolution = (1600, 600),
+    resolution = (2400, 600),
     backgroundcolor=:transparent,
 );
 
@@ -211,11 +211,8 @@ for (resi, res) in zip(1:3:length(dirs)*3, dirs)
     midys = midys[idxs]
     midxs = midxs[idxs]
     has_changed = true
-    if res == "pfkB.csv"
-        adj = 0.12
-    else
-        adj = 0.09
-    end
+    adj = 0.09
+
     while has_changed
         has_changed = false
         for i = 1:length(mids)-1
@@ -271,15 +268,13 @@ Legend(
     nbanks = 3,
 )
 
-substrate = Rect(0, -2.25, 32, 0.25)
+substrate = Rect(0, -2.25, 50, 0.25)
 poly!(ax, substrate, color=ColorSchemes.Set3_4[1])
-text!(ax, "Substrate"; position=Point2f(14, -2.5))
+text!(ax, "Substrate"; position=Point2f(20, -2.5))
 
-unclear = Rect(33, -2.25, 14, 0.25)
+unclear = Rect(51, -2.25, 32, 0.25)
 poly!(ax, unclear, color=ColorSchemes.Set3_4[4])
-text!(ax, "Other"; position=Point2f(39, -2.5))
-
+text!(ax, "Other"; position=Point2f(67, -2.5))
 
 fig
-
 CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "imgs", "crispr.pdf"), fig)

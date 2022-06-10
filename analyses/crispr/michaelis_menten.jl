@@ -333,7 +333,7 @@ function get_metabolite_sensitivities(ref_cond, kd_factor)
         nokdgcs = Dict(diffmodel.var_ids[idx] => x[idx] for idx in findall(startswith("b"), diffmodel.var_ids))
         flux_summary(nokdrfs)
         nokdgcs[target_gene]
-        # nokdrfs[target_reaction]
+        nokdrfs[target_reaction]
 
         #: limit enzyme 
         target_gene_prot_req = nokdgcs[target_gene] / kd_factor
