@@ -3,23 +3,23 @@ using Measurements, COBREXA, GLM, Statistics
 
 dirs = [ # order of paper
     "purB.csv"
-    # "pyrF.csv" #
-    # "aroA.csv" # 
+    "pyrF.csv"
+    "aroA.csv" 
     "purC.csv"
-    # "ptsH.csv"
-    # "pfkA.csv"
-    # "gnd.csv"
-    # "metE.csv"
-    # "sdh.csv"
-    # "adk.csv"
-    # "eno.csv"
-    # "pgi.csv"
-    # "cysH.csv"
-    # "fbaA.csv"
-    # "gdhA.csv"
-    # "pykF.csv"
-    # "tpiA.csv"
-    # "gltA.csv"
+    "ptsH.csv"
+    "pfkA.csv"
+    "gnd.csv"
+    "metE.csv"
+    "sdh.csv"
+    "adk.csv"
+    "eno.csv"
+    "pgi.csv"
+    "cysH.csv"
+    "fbaA.csv"
+    "gdhA.csv"
+    "pykF.csv"
+    "tpiA.csv"
+    "gltA.csv"
     # "glmS.csv"
     # "zwf.csv"
     # "ppc.csv"
@@ -52,18 +52,17 @@ kegg_mid_lu["C01094"] = "g6p"
 _lu(x) = get(kegg_mid_lu, x, x) 
 @transform!(metabolite_df, :Metabolite = _lu.(:Kegg))
 
-
 #: Plot figure
 fig = Figure(
-    resolution = (1600, 600),
-    backgroundcolor=:transparent,
+    # resolution = (1600, 600),
+    # backgroundcolor=:transparent,
 );
 
 ax = Axis(
     fig[1, 1],
     ylabel = "Scaled sensitivity of biomass growth rate\nto metabolite concentration",
     xlabel = "Measured metabolite concentration fold change",
-    xscale = log2,
+    xscale = log10,
 )
 
 fdir(x, y) = x == 1 ? -1 : y == 1 ? 1 : 0
@@ -84,6 +83,8 @@ for res in dirs
         :Metabolite .!= "pi"
         :Metabolite .!= "h2o"
         :Metabolite .!= "co2"
+        # :Metabolite .!= "atp"
+        # :Metabolite .!= "adp"
         :SubOrProdorNot .!= 0 
     end
 
@@ -95,12 +96,13 @@ for res in dirs
     jdf = innerjoin(df, tdf, on=:Metabolite)
     n = size(jdf, 1)
     append!(all_df, DataFrame(Metabolite=jdf[!, :Metabolite], Sensitivity=jdf[!, :Sensitivity], FoldChange = jdf[!, coln], KD=fill(string(coln), n)))
-    if n > 2
+    if n > 0
         scatter!(ax, jdf[!, coln], jdf[!, :Sensitivity], label=string(coln))
     end
 end
 fig[1, 2] = Legend(fig, ax, "Knockdowns", framevisible = false)
 fig
+
 CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "imgs", "crispr2.pdf"), fig)
 
 

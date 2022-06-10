@@ -52,7 +52,7 @@ kegg_mid_lu["C01094"] = "g6p"
 
 #: Plot figure
 fig = Figure(
-    resolution = (1600, 600),
+    resolution = (2400, 600),
     backgroundcolor=:transparent,
 );
 

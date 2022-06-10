@@ -35,12 +35,6 @@ dirs = [ # order of paper
 
 filter!(x -> x in readdir(joinpath("results", "crispr")), dirs)
 
-knockdown_df = transform(
-    DataFrame(CSV.File(joinpath("data", "crispr", "target_gene.csv"))),
-    :Reaction => ByRow(x -> rstrip.(split(x, "; "))) => :Reaction,
-)
-knockdown_df = flatten(knockdown_df, :Reaction)
-
 metabolite_df = DataFrame(CSV.File(joinpath("data", "crispr", "metabolite_data.csv")))
 rename!(metabolite_df, Dict("KEGG number" => :Kegg))
 
