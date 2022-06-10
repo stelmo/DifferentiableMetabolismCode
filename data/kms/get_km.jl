@@ -1,11 +1,10 @@
 using JSON, COBREXA, DataFrames, CSV, Statistics, DataFramesMeta
 
-dfr = DataFrame(CSV.File(joinpath("data", "kms", "kroll2021", "kmdata.csv")))
+dfr = DataFrame(CSV.File(joinpath("data", "kms", "kroll2021", "kmdata_inchi.csv")))
 rename!(dfr, Dict("KM [mM]" => :Km))
 @select!(dfr, :Km, :RIDS, :MIDS)
 
-model =
-    load_model(StandardModel, joinpath("model_construction", "model_files", "iML1515.json"))
+model = load_model(StandardModel, joinpath("model_construction", "model_files", "iML1515.json"))
 
 d = Dict()
 for df in groupby(dfr, :RIDS)

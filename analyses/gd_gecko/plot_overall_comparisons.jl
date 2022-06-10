@@ -1,5 +1,5 @@
 using ColorSchemes, CairoMakie, DataFrames, DataFramesMeta, Chain, CSV
-using Measurements
+using Measurements, Statistics
 
 kmax_brenda_df = DataFrame(CSV.File(joinpath("results", "gd_gecko", "kmax_brenda_df.csv")))
 polish_df = DataFrame(CSV.File(joinpath("results", "gd_gecko", "polish_df.csv")))
@@ -11,9 +11,16 @@ ga = fig[1, 1] = GridLayout()
 gb = fig[1, 2] = GridLayout()
 
 #: Plot hold outs
-xlabs = polish_df[!, :Condition]
-rloss = polish_df[!, :Rloss] .± polish_df[!, :RlossSTD]
-ploss = polish_df[!, :Ploss] .± polish_df[!, :PlossSTD]
+polish_df_c = combine(
+    groupby(polish_df, :Condition),
+    :Rloss => mean => :Rloss,
+    :Ploss => mean => :Ploss,
+    :Rloss => std => :RlossSTD,
+    :Ploss => std => :PlossSTD,
+)
+xlabs = polish_df_c[!, :Condition]
+rloss = polish_df_c[!, :Rloss] .± polish_df_c[!, :RlossSTD]
+ploss = polish_df_c[!, :Ploss] .± polish_df_c[!, :PlossSTD]
 
 frac_improv = (rloss .- ploss) ./ rloss
 

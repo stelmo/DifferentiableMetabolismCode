@@ -7,7 +7,7 @@ include(joinpath("analyses", "metabolite_estimates.jl"))
 using .MetaboliteEstimates
 using JuMP, KNITRO
 
-function get_metabolite_sensitivities(ref_cond)
+function get_metabolite_sensitivities(ref_cond, kd_factor)
     try
         #: import model and data files
         base_load_path = joinpath("model_construction", "processed_models_files", "ecoli")
@@ -21,8 +21,9 @@ function get_metabolite_sensitivities(ref_cond)
         )
 
         model.reactions["EX_glc__D_e"].lb = -1000.0 # unconstrain because enzyme constraints take over
+        model.reactions["ATPM"].lb = 0.0 # remove because only interested in derivatives
 
-        #: setup gecko data 
+        #: extract fastest enzyme
         reaction_isozymes = Dict(
             rid => [
                 Isozyme(
@@ -37,7 +38,6 @@ function get_metabolite_sensitivities(ref_cond)
                 ) for i = 1:length(reaction_kcats[rid])
             ] for rid in keys(reaction_kcats)
         )
-
         for rid in keys(reaction_isozymes)
             if rid == "GLUDy" # the slower homohexamer is expressed! 
                 reaction_isozymes[rid] = [first(reaction_isozymes[rid])]
@@ -51,23 +51,25 @@ function get_metabolite_sensitivities(ref_cond)
             end
         end
 
+        #: set protein bounds
         gene_product_bounds(gid) = (0, 200_000.0)
-        gene_product_mass_group_bound = Dict("uncategorized" => 650_000.0) # more than enough, minimized later
+        gene_product_mass_group_bound = Dict("uncategorized" => 320_000.0)
 
         #: knockdown data
         knockdown_df = transform(
-            DataFrame(CSV.File(joinpath("data", "crispr", "target_gene.csv"))),
+            DataFrame(CSV.File(joinpath("data", "crispr", "target_gene_rid.csv"))),
             :Reaction => ByRow(x -> rstrip.(split(x, "; "))) => :Reaction,
         )
         knockdown_df = flatten(knockdown_df, :Reaction)
 
-        #: Get reference and KD ids 
+        #: Get KD gene and reaction ids 
         df = @subset knockdown_df begin
             :Target .== ref_cond
         end
-        rid_kds = String.(strip.(df[!, :Reaction]))
+        target_reaction = first(String.(strip.(df[!, :Reaction])))
         target_gene = String(first(knockdown_df[knockdown_df[!, :Target].==ref_cond, :Gene]))
 
+        #: Get a reference solution that uses the gene and associated reaction
         gm = make_gecko_model(
             model;
             reaction_isozymes,
@@ -76,7 +78,7 @@ function get_metabolite_sensitivities(ref_cond)
             gene_product_mass_group_bound,
         )
 
-        rfluxes_ref = flux_balance_analysis_dict(
+        biomass_max = flux_balance_analysis_dict(
             gm,
             CPLEX.Optimizer;
             modifications = [
@@ -85,7 +87,7 @@ function get_metabolite_sensitivities(ref_cond)
                 COBREXA.silence,
             ],
         )
-        μ_ref = rfluxes_ref["BIOMASS_Ec_iML1515_core_75p37M"]
+        μ_ref = biomass_max["BIOMASS_Ec_iML1515_core_75p37M"]
 
         opt_model = flux_balance_analysis(
             gm,
@@ -95,25 +97,17 @@ function get_metabolite_sensitivities(ref_cond)
                 change_optimizer_attribute("CPX_PARAM_SCAIND", 1),
                 COBREXA.silence,
                 change_objective(target_gene; sense = COBREXA.MAX_SENSE),
+                # change_objective(target_reaction*"#forward#1"; sense = COBREXA.MAX_SENSE),
                 change_constraint("BIOMASS_Ec_iML1515_core_75p37M"; lb = μ_ref, ub = 1000),
             ],
         )
         rfluxes_ref = flux_dict(gm, opt_model)
         gpconcs_ref = gene_product_dict(gm, opt_model)
         tg_ref = gpconcs_ref[target_gene]
-        if tg_ref < 1 # need to actually use gene
-            biomass_relax = 0.5 
-
-            rfluxes_ref = flux_balance_analysis_dict(
-                gm,
-                CPLEX.Optimizer;
-                modifications = [
-                    change_optimizer_attribute("CPXPARAM_Emphasis_Numerical", 1),
-                    change_optimizer_attribute("CPX_PARAM_SCAIND", 1),
-                    COBREXA.silence,
-                ],
-            )
-            μ_ref = rfluxes_ref["BIOMASS_Ec_iML1515_core_75p37M"]
+        tf_ref = rfluxes_ref[target_reaction]
+        
+        if tg_ref < 1 # must use target gene 
+            biomass_relax = 0.5
     
             opt_model = flux_balance_analysis(
                 gm,
@@ -129,92 +123,40 @@ function get_metabolite_sensitivities(ref_cond)
             rfluxes_ref = flux_dict(gm, opt_model)
             gpconcs_ref = gene_product_dict(gm, opt_model)
             tg_ref = gpconcs_ref[target_gene]
+            tf_ref = rfluxes_ref[target_reaction]
         else
             biomass_relax = 1.0
         end
         flux_summary(rfluxes_ref)
 
-        opt_model = flux_balance_analysis(
-            gm,
-            CPLEX.Optimizer;
-            modifications = [
-                change_optimizer_attribute("CPXPARAM_Emphasis_Numerical", 1),
-                change_optimizer_attribute("CPX_PARAM_SCAIND", 1),
-                COBREXA.silence,
-                change_objective(genes(gm); sense = COBREXA.MIN_SENSE),
-                change_constraint("BIOMASS_Ec_iML1515_core_75p37M"; lb = biomass_relax*μ_ref, ub = 1000),
-                change_constraint(target_gene; lb = tg_ref, ub = 200_000),
-            ],
-        )
-        rfluxes_ref = flux_dict(gm, opt_model)
-        gpconcs_ref = gene_product_dict(gm, opt_model)
-        flux_summary(rfluxes_ref)
-        gpconcs_ref[target_gene]
-
-        #: Get knockdown condition
-        kd_factor = 5
-        target_gene_prot_req = gpconcs_ref[target_gene] / kd_factor
-        gene_product_bounds_kd(x) =
-            x == target_gene ? (target_gene_prot_req*0.75, target_gene_prot_req*1.25) : (0.0, 200_000.0)
-        gene_product_mass_group_bound_kd = Dict("uncategorized" => 650_000.0) # more than enough, protein limitation limits everything
-
-        gm_kd = make_gecko_model(
-            model;
-            reaction_isozymes,
-            gene_product_bounds = gene_product_bounds_kd,
-            gene_product_molar_mass,
-            gene_product_mass_group_bound = gene_product_mass_group_bound_kd,
-        )
-
-        opt_model = flux_balance_analysis(
-            gm_kd,
-            CPLEX.Optimizer;
-            modifications = [
-                change_optimizer_attribute("CPXPARAM_Emphasis_Numerical", 1),
-                change_optimizer_attribute("CPX_PARAM_SCAIND", 1),
-                COBREXA.silence,
-            ],
-        )
-        rfluxes_kd = flux_dict(gm_kd, opt_model)
-        gpconcs_kd = gene_product_dict(gm_kd, opt_model)
-        flux_summary(rfluxes_kd)
-
-        pmodel = prune_model(model, rfluxes_kd)
-
-        loopless_mods = [
-            add_loopless_constraints(), 
-            COBREXA.silence,
-        ]
-
-        # ensure reaction of interest is not lost
-        for rid_kd in rid_kds
-            fff = rfluxes_kd[rid_kd]
-            if fff > 1e-3
-                push!(
-                    loopless_mods,
-                    change_constraint(rid_kd; lb=0.9*fff, ub=1000)
-                )
-            elseif fff < -1e-3
-                push!(
-                    loopless_mods,
-                    change_constraint(rid_kd; lb=-1000, ub=0.9*fff)
-                )
-            end
-        end
+        pmodel = prune_model(model, rfluxes_ref)
       
         loopless_sol = flux_balance_analysis_dict(
             pmodel,
             CPLEX.Optimizer;
-            modifications = loopless_mods,
+            modifications = [
+                add_loopless_constraints(), 
+                COBREXA.silence,
+            ],
         )
         pmodel = prune_model(pmodel, loopless_sol)
 
+        #: some kms make everything infeasible
+        skip_kms = [
+            "UPPDC1"
+            "ACOAD6f"
+            "ACOAD1fr"
+            "ACOAD5f"
+            "MTHFR2"
+            "FADRx"
+            "ACOAD3f"
+        ]
         #: load km data
-        _rid_km =
-            JSON.parsefile(joinpath("data", "kms", "kroll2021", "kmdata_iml1515.json"))
+        _rid_km = JSON.parsefile(joinpath("data", "kms", "kroll2021", "kmdata_iml1515.json"))
         rid_km = Dict{String,Dict{String,Float64}}()
         for (rid, td) in _rid_km
             rid ∉ reactions(pmodel) && continue
+            rid in skip_kms && continue
             isnothing(reaction_gene_association(pmodel, rid)) && continue
             isempty(reaction_gene_association(pmodel, rid)) && continue
 
@@ -223,25 +165,6 @@ function get_metabolite_sensitivities(ref_cond)
                 rid_km[rid][mid] = km * 1e-3 # convert to Molar from mM
             end
         end
-
-        del_list = [ 
-            "ACOAD6f"
-            "ANPRT"
-            "CPPPGO"
-            "ACOAD5f"
-            "ACOAD3f"
-            "DHORD2"
-            "ACOAD7f"
-            "AHCYSNS"
-            "HACD2"
-            "HACD4"
-            "HACD7"
-            "HACD6"
-            "HACD1"
-            "HACD5"
-            "HACD3"
-        ]
-        delete!.(Ref(rid_km), del_list) # trial and error
 
         _km_concs = Dict{String,Vector{Float64}}()
         for (rid, d) in rid_km
@@ -298,17 +221,31 @@ function get_metabolite_sensitivities(ref_cond)
             end
         end
 
-        mmdf = MetaboliteEstimates.get_thermo_and_saturation_concentrations(
+        mmdf = max_min_driving_force(
             pmodel,
             rid_dg0,
-            km_concs,
-            2.0,
             CPLEX.Optimizer;
             flux_solution = loopless_sol,
             proton_ids = ["h_c", "h_e", "h_p"],
             water_ids = ["h2o_c", "h2o_e", "h2o_p"],
-            concentration_lb = mid -> get(km_concs, mid, 1e-6) / 1000,
-            concentration_ub = mid -> get(km_concs, mid, 0.1 / 10) * 10,
+            concentration_lb = 1e-9,
+            concentration_ub = 0.1,
+            ignore_reaction_ids = ["Htex", "H2Otex", "H2Otpp"],
+            modifications = [COBREXA.silence],
+        )
+
+        thermo_relax = 3
+        kmconcs = MetaboliteEstimates.get_thermo_and_saturation_concentrations(
+            pmodel,
+            rid_dg0,
+            km_concs,
+            mmdf.mmdf/thermo_relax,
+            CPLEX.Optimizer;
+            flux_solution = loopless_sol,
+            proton_ids = ["h_c", "h_e", "h_p"],
+            water_ids = ["h2o_c", "h2o_e", "h2o_p"],
+            concentration_lb = x -> 1e-9,
+            concentration_ub = x -> 0.1,
             ignore_reaction_ids = ["Htex", "H2Otex", "H2Otpp"],
             modifications = [COBREXA.silence],
         )
@@ -317,27 +254,31 @@ function get_metabolite_sensitivities(ref_cond)
             pmodel,
             rid_dg0,
             rid_km,
-            mmdf.concentrations,
-            2.0,
+            kmconcs.concentrations,
+            mmdf.mmdf/thermo_relax,
             optimizer_with_attributes(KNITRO.Optimizer,"honorbnds" => 1);
             flux_solution = loopless_sol,
             proton_ids = ["h_c", "h_e", "h_p"],
             water_ids = ["h2o_c", "h2o_e", "h2o_p"],
-            concentration_lb = mid -> get(km_concs, mid, 1e-6) / 1000,
-            concentration_ub = mid -> get(km_concs, mid, 0.1 / 10) * 10,
+            concentration_lb = mid -> get(kmconcs.concentrations, mid, 1e-9) / 10,
+            concentration_ub = mid -> get(kmconcs.concentrations, mid, 0.1) * 10,
             ignore_reaction_ids = ["Htex", "H2Otex", "H2Otpp"],
             modifications = [COBREXA.silence],
             ignore_metabolite_ids = ["h_c", "h_e", "h_p", "h2o_c", "h2o_e", "h2o_p"],
         )
+        ks = collect(keys(minlims.saturation))
+        vs = collect(values(minlims.saturation))
+        idxs = sortperm(vs)
+        [ks[idxs] vs[idxs]]
+        minimum(vs) < 0.01 && error("Too limited!")
 
         #: get rid_enzyme 
-
         rid_enzyme = Dict(
             rid => isozyme_to_enzyme(first(isozyme_vec), gene_product_molar_mass) for
             (rid, isozyme_vec) in reaction_isozymes
         )
 
-        #: Differentiate to get reference growth rate 
+        #: Differentiate WT to get reference growth rate
         pgm_nokd = make_gecko_model(
             pmodel;
             reaction_isozymes,
@@ -345,6 +286,21 @@ function get_metabolite_sensitivities(ref_cond)
             gene_product_molar_mass,
             gene_product_mass_group_bound = gene_product_mass_group_bound,
         )
+
+        opt_model = flux_balance_analysis(
+            pgm_nokd,
+            CPLEX.Optimizer;
+            modifications = [
+                change_optimizer_attribute("CPXPARAM_Emphasis_Numerical", 1),
+                change_optimizer_attribute("CPX_PARAM_SCAIND", 1),
+                COBREXA.silence,
+            ],
+        )
+
+        rfluxes_nokd = flux_dict(pgm_nokd, opt_model)
+        gpconcs_nokd = gene_product_dict(pgm_nokd, opt_model)
+        gpconcs_nokd[target_gene]
+        flux_summary(rfluxes_nokd)
 
         diffmodel = with_parameters(
             pgm_nokd,
@@ -373,9 +329,17 @@ function get_metabolite_sensitivities(ref_cond)
             scale_output = true,
         )
         nokdrfs = Dict(fluxes(pgm_nokd) .=> reaction_flux(pgm_nokd)' * x)
+        nokdgcs = Dict(diffmodel.var_ids[idx] => x[idx] for idx in findall(startswith("b"), diffmodel.var_ids))
         flux_summary(nokdrfs)
+        nokdgcs[target_gene]
+        nokdrfs[target_reaction]
 
-        #: Differentiate but take into account kinetics
+        #: limit enzyme 
+        target_gene_prot_req = nokdgcs[target_gene] / kd_factor
+        gene_product_bounds_kd(x) = x == target_gene ? (0.0, target_gene_prot_req) : (0.0, 200_000.0)
+        gene_product_mass_group_bound_kd = Dict("uncategorized" => 320_000.0)
+
+        #: Differentiate KD
         pgm_kd = make_gecko_model(
             pmodel;
             reaction_isozymes,
@@ -396,6 +360,7 @@ function get_metabolite_sensitivities(ref_cond)
 
         rfluxes_kd = flux_dict(pgm_kd, opt_model)
         gpconcs_kd = gene_product_dict(pgm_kd, opt_model)
+        gpconcs_kd[target_gene]
         flux_summary(rfluxes_kd)
 
         diffmodel = with_parameters(
@@ -424,11 +389,27 @@ function get_metabolite_sensitivities(ref_cond)
             use_analytic = false,
             scale_output = true,
         )
+        kdrfs = Dict(fluxes(pgm_kd) .=> reaction_flux(pgm_kd)' * x)
+        kdgcs = Dict(diffmodel.var_ids[idx] => x[idx] for idx in findall(startswith("b"), diffmodel.var_ids))
+        flux_summary(kdrfs)
+        kdrfs[target_reaction]
+        kdgcs[target_gene]
 
-        #: Plot 
-        rfs = Dict(fluxes(pgm_kd) .=> reaction_flux(pgm_kd)' * x)
-        flux_summary(rfs)
+        #: get all affected reactions 
+        affected_rids = String[]
+        for rid in reactions(pmodel)
+            grrs = reaction_gene_association(pmodel, rid)
+            isnothing(grrs) && continue 
+            for grr in grrs 
+                if target_gene in grr 
+                    push!(affected_rids, rid)
+                    break
+                end
+            end
+        end
+        unique!(affected_rids)
 
+        #: get data
         biomass_idx = findfirst(startswith("BIOMASS_"), diffmodel.var_ids)
         conc_idxs = findall(startswith("c#"), diffmodel.param_ids)
         conc_ids = diffmodel.param_ids[conc_idxs]
@@ -438,11 +419,11 @@ function get_metabolite_sensitivities(ref_cond)
         rmets = String[]
         rsubs = Float64[]
         rprods = Float64[]
-        for rid_kd in rid_kds
-            if abs(get(rfs, rid_kd, 0)) > 0
-                for (k, v) in reaction_stoichiometry(pgm_kd, rid_kd)
+        for affected_rid in affected_rids
+            if abs(get(kdrfs, affected_rid, 0)) > 0
+                for (k, v) in reaction_stoichiometry(pgm_kd, affected_rid)
                     k in rmets && continue
-                    if v * rfs[rid_kd] > 0 # product 
+                    if v * kdrfs[affected_rid] > 0 # product 
                         push!(rmets, k)
                         push!(rsubs, 0.0)
                         push!(rprods, 1.0)
@@ -462,7 +443,7 @@ function get_metabolite_sensitivities(ref_cond)
         sens = [conc_sens[met_idxs]; conc_sens[big_idxs]]
         subs = [rsubs; fill(0.0, length(big_idxs))]
         prods = [rprods; fill(0.0, length(big_idxs))]
-        kd_growth = fill(rfs["BIOMASS_Ec_iML1515_core_75p37M"], length(subs))
+        kd_growth = fill(kdrfs["BIOMASS_Ec_iML1515_core_75p37M"], length(subs))
         ref_growth = fill(nokdrfs["BIOMASS_Ec_iML1515_core_75p37M"], length(subs))
         df = DataFrame(
             Metabolite = mids,
@@ -515,7 +496,7 @@ targets = [
 ]
 
 for target in targets
-    get_metabolite_sensitivities(target)
+    get_metabolite_sensitivities(target, 5)
 end
 
 

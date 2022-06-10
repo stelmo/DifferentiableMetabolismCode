@@ -113,7 +113,6 @@ function get_thermo_and_saturation_concentrations(
     end
 
     optimize!(opt_model)
-    println(objective_value(opt_model))
     is_solved(opt_model) || return nothing
 
     return (

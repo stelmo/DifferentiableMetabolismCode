@@ -236,11 +236,5 @@ end
 
 CSV.write(
     joinpath("results", "gd_gecko", "polish_df.csv"),
-    combine(
-        groupby(df, :Condition),
-        :Rloss => mean => :Rloss,
-        :Ploss => mean => :Ploss,
-        :Rloss => std => :RlossSTD,
-        :Ploss => std => :PlossSTD,
-    ),
+    df,
 )
