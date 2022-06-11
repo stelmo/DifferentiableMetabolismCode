@@ -96,7 +96,7 @@ function get_metabolite_sensitivities(ref_cond, kd_factor)
                 change_optimizer_attribute("CPXPARAM_Emphasis_Numerical", 1),
                 change_optimizer_attribute("CPX_PARAM_SCAIND", 1),
                 COBREXA.silence,
-                change_objective(target_gene; sense = COBREXA.MAX_SENSE),
+                change_objective(target_gene; sense = COBREXA.MIN_SENSE),
                 change_constraint("BIOMASS_Ec_iML1515_core_75p37M"; lb = μ_ref, ub = 1000),
             ],
         )
@@ -123,8 +123,7 @@ function get_metabolite_sensitivities(ref_cond, kd_factor)
             gpconcs_ref = gene_product_dict(gm, opt_model)
             tg_ref = gpconcs_ref[target_gene]
             # tf_ref = rfluxes_ref[target_reaction]
-        else
-            biomass_relax = 1.0
+    
         end
         flux_summary(rfluxes_ref)
 
@@ -333,7 +332,7 @@ function get_metabolite_sensitivities(ref_cond, kd_factor)
         nokdgcs = Dict(diffmodel.var_ids[idx] => x[idx] for idx in findall(startswith("b"), diffmodel.var_ids))
         flux_summary(nokdrfs)
         nokdgcs[target_gene]
-        nokdrfs[target_reaction]
+        # nokdrfs[target_reaction]
 
         #: limit enzyme 
         target_gene_prot_req = nokdgcs[target_gene] / kd_factor
@@ -465,42 +464,37 @@ function get_metabolite_sensitivities(ref_cond, kd_factor)
 end
 
 targets = [
-    # "adk"
-    # "aroA"
-    # "carA"
+    "adk"
+    "aroA"
+    "carA"
     "cysH"
-    # "dxs"
+    "dxs"
     "eno"
     "fbaA"
-    # "gapA"
-    # "gdhA"
-    # "glmS"
-    # "gltA"
-    # "gnd"
-    # "ilvC"
-    # "metE"
-    # "pck"
-    # "pfkA"
-    # "pfkB"
-    # "pgi"
-    # "ppc"
-    # "prs"
-    # "ptsH"
-    # "purB"
-    # "purC"
+    "gapA"
+    "gdhA"
+    "glmS"
+    "gltA"
+    "gnd"
+    "ilvC"
+    "metE"
+    "pck"
+    "pfkA"
+    "pfkB"
+    "pgi"
+    "ppc"
+    "prs"
+    "ptsH"
+    "purB"
+    "purC"
     "pykA"
-    # "pykF"
-    # "pyrF"
-    # "sdhC"
-    # "tpiA"
-    # "zwf"
+    "pykF"
+    "pyrF"
+    "sdhC"
+    "tpiA"
+    "zwf"
 ]
 
 for target in targets
     get_metabolite_sensitivities(target, 5)
 end
-
-# cysH, key error PAPSR
-# eno, interrupt 
-# fbaA, key error FBA3
-# pykA, key error PYK

@@ -277,4 +277,4 @@ poly!(ax, unclear, color=ColorSchemes.Set3_4[4])
 text!(ax, "Other"; position=Point2f(67, -2.5))
 
 fig
-CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "imgs", "crispr.pdf"), fig)
+CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "imgs", "crispr_all.pdf"), fig)
