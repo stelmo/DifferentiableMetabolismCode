@@ -2,7 +2,7 @@ using ColorSchemes, CairoMakie, DataFrames, DataFramesMeta, Chain, CSV
 using Measurements, COBREXA
 
 dirs = [ # order of paper
-    "purB.csv"
+    # "purB.csv"
     "pyrF.csv"
     "aroA.csv"
     "purC.csv"
@@ -21,7 +21,7 @@ dirs = [ # order of paper
     # "tpiA.csv"
     # "gltA.csv"
     "glmS.csv"
-    "zwf.csv"
+    # "zwf.csv"
     # "ppc.csv"
     # "carA.csv"
     # "dxs.csv"
@@ -211,7 +211,7 @@ for (resi, res) in zip(1:3:length(dirs)*3, dirs)
     midys = midys[idxs]
     midxs = midxs[idxs]
     has_changed = true
-    adj = 0.09
+    adj = 0.12
 
     while has_changed
         has_changed = false
@@ -268,14 +268,13 @@ Legend(
     nbanks = 3,
 )
 
-substrate = Rect(0, -2.25, 11, 0.25)
+substrate = Rect(0, -2.25, 8, 0.25)
 poly!(ax, substrate, color=ColorSchemes.Set3_4[1])
-text!(ax, "Substrate"; position=Point2f(4, -2.5))
+text!(ax, "Substrate regulation"; position=Point2f(2, -2.5))
 
-unclear = Rect(12, -2.25, 11, 0.25)
+unclear = Rect(9, -2.25, 8, 0.25)
 poly!(ax, unclear, color=ColorSchemes.Set3_4[4])
-text!(ax, "Other"; position=Point2f(17, -2.5))
-
+text!(ax, "Other regulation"; position=Point2f(11.5, -2.5))
 
 fig
 CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "imgs", "crispr_few.pdf"), fig)
