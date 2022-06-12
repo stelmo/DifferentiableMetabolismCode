@@ -22,14 +22,14 @@ dirs = [ # order of paper
     # "gltA.csv"
     "glmS.csv"
     # "zwf.csv"
-    # "ppc.csv"
+    "ppc.csv"
     # "carA.csv"
     # "dxs.csv"
     "gapA.csv"
     # "prs.csv"
     # "ilvC.csv"
     # "pykA.csv"
-    "pfkB.csv"
+    # "pfkB.csv"
     # "pck.csv"
 ]
 
