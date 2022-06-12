@@ -2,6 +2,8 @@ module MetaboliteEstimates
 
 using COBREXA
 using JuMP #max driving force of metabolic reactions
+using CPLEX, KNITRO, DifferentiableMetabolism
+using JSON, Statistics, SparseArrays
 
 function get_thermo_and_saturation_concentrations(
     model::MetabolicModel,
@@ -305,6 +307,218 @@ function min_limitation(
             rid => value(opt_model[:sats][i]) for (i, rid) in enumerate(reactions(model))
         )
     )
+end
+
+function estimate_metabolite_concentrations(pmodel, rid_dg0, rid_km, km_concs, loopless_sol)
+
+    mmdf = max_min_driving_force(
+        pmodel,
+        rid_dg0,
+        CPLEX.Optimizer;
+        flux_solution = loopless_sol,
+        proton_ids = ["h_c", "h_e", "h_p"],
+        water_ids = ["h2o_c", "h2o_e", "h2o_p"],
+        concentration_lb = 1e-9,
+        concentration_ub = 0.1,
+        ignore_reaction_ids = ["Htex", "H2Otex", "H2Otpp"],
+        modifications = [COBREXA.silence],
+    )
+
+    thermo_relax = 3
+    kmconcs = MetaboliteEstimates.get_thermo_and_saturation_concentrations(
+        pmodel,
+        rid_dg0,
+        km_concs,
+        mmdf.mmdf/thermo_relax,
+        CPLEX.Optimizer;
+        flux_solution = loopless_sol,
+        proton_ids = ["h_c", "h_e", "h_p"],
+        water_ids = ["h2o_c", "h2o_e", "h2o_p"],
+        concentration_lb = x -> 1e-9,
+        concentration_ub = x -> 0.1,
+        ignore_reaction_ids = ["Htex", "H2Otex", "H2Otpp"],
+        modifications = [COBREXA.silence],
+    )
+
+    minlims = MetaboliteEstimates.min_limitation(
+        pmodel,
+        rid_dg0,
+        rid_km,
+        kmconcs.concentrations,
+        mmdf.mmdf/thermo_relax,
+        optimizer_with_attributes(KNITRO.Optimizer,"honorbnds" => 1);
+        flux_solution = loopless_sol,
+        proton_ids = ["h_c", "h_e", "h_p"],
+        water_ids = ["h2o_c", "h2o_e", "h2o_p"],
+        concentration_lb = mid -> get(kmconcs.concentrations, mid, 1e-9) / 10,
+        concentration_ub = mid -> get(kmconcs.concentrations, mid, 0.1) * 10,
+        ignore_reaction_ids = ["Htex", "H2Otex", "H2Otpp"],
+        modifications = [COBREXA.silence],
+        ignore_metabolite_ids = ["h_c", "h_e", "h_p", "h2o_c", "h2o_e", "h2o_p"],
+    )
+
+    return minlims 
+end
+
+function get_parameters(pmodel, loopless_sol)
+    #: some kms make everything infeasible, remove these
+    skip_kms = [
+        "UPPDC1"
+        "ACOAD6f"
+        "ACOAD1fr"
+        "ACOAD5f"
+        "MTHFR2"
+        "FADRx"
+        "ACOAD3f"
+    ]
+    
+    #: load km data
+    _rid_km = JSON.parsefile(joinpath("data", "kms", "kroll2021", "kmdata_iml1515.json"))
+    rid_km = Dict{String,Dict{String,Float64}}()
+    for (rid, td) in _rid_km
+        rid ∉ reactions(pmodel) && continue
+        rid in skip_kms && continue
+        isnothing(reaction_gene_association(pmodel, rid)) && continue
+        isempty(reaction_gene_association(pmodel, rid)) && continue
+
+        rid_km[rid] = Dict{String,Float64}()
+        for (mid, km) in td
+            rid_km[rid][mid] = km * 1e-3 # convert to Molar from mM
+        end
+    end
+
+    _km_concs = Dict{String,Vector{Float64}}()
+    for (rid, d) in rid_km
+        rs = reaction_stoichiometry(pmodel, rid)
+        for (mid, km) in d
+            if loopless_sol[rid] > 0 && rs[mid] < 0
+                _km_concs[mid] = push!(get(_km_concs, mid, Float64[]), km)
+            elseif loopless_sol[rid] < 0 && rs[mid] > 0
+                _km_concs[mid] = push!(get(_km_concs, mid, Float64[]), km)
+            end
+        end
+    end
+    km_concs = Dict(k => mean(v) for (k, v) in _km_concs)
+
+    #: get reasonable concentrations
+    rid_dg0 = Dict(
+        rid => float(v) for (rid, v) in
+        JSON.parsefile(joinpath("data", "thermodynamics", "iML1515_thermo.json")) if
+        rid in reactions(pmodel) &&
+        !isnothing(reaction_gene_association(pmodel, rid)) &&
+        !isempty(reaction_gene_association(pmodel, rid))
+    )
+
+    subsysts = [
+        "Citric Acid Cycle"
+        "Glycolysis/Gluconeogenesis"
+        "Pentose Phosphate Pathway"
+        "Pyruvate Metabolism"
+        "Anaplerotic Reactions"
+        "Alternate Carbon Metabolism"
+        "Oxidative Phosphorylation"
+        "Valine, Leucine, and Isoleucine Metabolism"
+        "Cysteine Metabolism"
+        "Glycine and Serine Metabolism"
+        "Threonine and Lysine Metabolism"
+        "Methionine Metabolism"
+        "Histidine Metabolism"
+        "Tyrosine, Tryptophan, and Phenylalanine Metabolism"
+        "Arginine and Proline Metabolism"
+        "Alanine and Aspartate Metabolism"
+        "Glutamate Metabolism"
+        "Nitrogen Metabolism"
+        "Purine and Pyrimidine Biosynthesis"
+        "Lipopolysaccharide Biosynthesis / Recycling"
+        "Membrane Lipid Metabolism"
+        "Glycerophospholipid Metabolism"
+        "Murein Biosynthesis"
+        "Folate Metabolism"
+        "Inorganic Ion Transport and Metabolism"
+    ]
+    for rid in keys(rid_dg0)
+        if pmodel.reactions[rid].subsystem ∉ subsysts || rid ∉ reactions(pmodel)
+            delete!(rid_dg0, rid)
+        end
+    end
+
+    return rid_dg0, rid_km, km_concs
+end
+
+function simulate_wt(
+    pmodel, 
+    reaction_isozymes, 
+    gene_product_bounds, 
+    gene_product_molar_mass, 
+    gene_product_mass_group_bound, 
+    target_gene,
+    target_reaction,
+    rid_enzyme,
+    rid_dg0,
+    rid_km,
+    mid_concentration,
+)
+    #: Simulate WT to get reference growth rate
+    pgm_nokd = make_gecko_model(
+        pmodel;
+        reaction_isozymes,
+        gene_product_bounds,
+        gene_product_molar_mass,
+        gene_product_mass_group_bound,
+    )
+
+    # opt_model = flux_balance_analysis(
+    #     pgm_nokd,
+    #     CPLEX.Optimizer;
+    #     modifications = [
+    #         change_optimizer_attribute("CPXPARAM_Emphasis_Numerical", 1),
+    #         change_optimizer_attribute("CPX_PARAM_SCAIND", 1),
+    #         COBREXA.silence,
+    #     ],
+    # )
+
+    # rfluxes_nokd = flux_dict(pgm_nokd, opt_model)
+    # gpconcs_nokd = gene_product_dict(pgm_nokd, opt_model)
+    # gpconcs_nokd[target_gene]
+    # flux_summary(rfluxes_nokd)
+
+    diffmodel = with_parameters(
+        pgm_nokd,
+        rid_enzyme;
+        rid_dg0,
+        rid_km,
+        mid_concentration,
+        scale_equality = true,
+        scale_inequality = true,
+        ignore_reaction_ids = ["Htex", "H2Otex", "H2Otpp"],
+        ignore_metabolite_ids = ["h2o_c", "h2o_e", "h2o_p", "h_c", "h_e", "h_p"],
+    )
+
+    nvars = length(diffmodel.c(diffmodel.θ))
+    update_Q!(diffmodel, x -> spdiagm(1e-9 .* ones(nvars))) # make sure can differentiate
+
+    x = zeros(length(diffmodel.var_ids))
+    ν = zeros(length(diffmodel.d(diffmodel.θ)))
+    λ = zeros(length(diffmodel.h(diffmodel.θ)))
+    DifferentiableMetabolism._solve_model!(
+        x,
+        ν,
+        λ,
+        diffmodel,
+        CPLEX.Optimizer;
+        modifications = [
+            change_optimizer_attribute("CPXPARAM_Emphasis_Numerical", 1),
+            change_optimizer_attribute("CPX_PARAM_SCAIND", 1),
+            COBREXA.silence,
+        ]
+    )
+    
+    nokdrfs = Dict(fluxes(pgm_nokd) .=> reaction_flux(pgm_nokd)' * x)
+    nokdgcs = Dict(diffmodel.var_ids[idx] => x[idx] for idx in findall(startswith("b"), diffmodel.var_ids))
+    # flux_summary(nokdrfs)
+    # nokdgcs[target_gene]
+    # nokdrfs[target_reaction]
+    return nokdgcs[target_gene], nokdrfs["BIOMASS_Ec_iML1515_core_75p37M"]
 end
 
 end # module
