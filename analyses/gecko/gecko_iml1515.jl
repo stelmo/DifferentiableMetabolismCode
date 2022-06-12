@@ -35,7 +35,7 @@ reaction_isozymes = Dict(
     ] for rid in keys(reaction_kcats)
 )
 gene_product_bounds(gid) = (0, 100_000.0)
-gene_product_mass_group_bound = Dict("uncategorized" => 500_000.0)
+gene_product_mass_group_bound = Dict("uncategorized" => 320_000.0)
 
 #: run gecko to prune the model
 gm = make_gecko_model(
@@ -141,7 +141,9 @@ Visualize.plot_escher_viz(
     rids,
     fluxes,
     reaction_mass,
-    joinpath("data", "maps", "simplified_core_iml1515_map.json"),
+    joinpath("data", "maps", "simplified_core_iml1515_map.json");
+    rts = 8,
+    mts = 8,
 )
 fig
 CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "imgs", "gecko_map_iml1515.pdf"), fig)

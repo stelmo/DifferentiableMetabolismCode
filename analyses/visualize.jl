@@ -124,7 +124,7 @@ function plot_gradients(results_dir)
 
 end
 
-function plot_escher_viz(ax1, ax2, rids, sol, reaction_mass, escher_loc)
+function plot_escher_viz(ax1, ax2, rids, sol, reaction_mass, escher_loc; mts=4, rts=4)
 
     rd = Dict(k => v > 0 ? :f : :b for (k, v) in sol)
 
@@ -159,6 +159,8 @@ function plot_escher_viz(ax1, ax2, rids, sol, reaction_mass, escher_loc)
         annotation_show_text = true,
         # reaction_directions = rd,
         reaction_edge_widths = re,
+        reaction_text_size = rts,
+        metabolite_text_size = mts,
     )
     hidexdecorations!(ax1)
     hideydecorations!(ax1)

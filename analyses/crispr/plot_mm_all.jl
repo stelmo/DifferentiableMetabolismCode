@@ -52,7 +52,7 @@ kegg_mid_lu["C01094"] = "g6p"
 
 #: Plot figure
 fig = Figure(
-    resolution = (2400, 600),
+    resolution = (2400, 1200),
     backgroundcolor=:transparent,
 );
 
@@ -270,11 +270,11 @@ Legend(
 
 substrate = Rect(0, -2.25, 50, 0.25)
 poly!(ax, substrate, color=ColorSchemes.Set3_4[1])
-text!(ax, "Substrate"; position=Point2f(20, -2.5))
+text!(ax, "Substrate regulation"; position=Point2f(20, -2.4))
 
 unclear = Rect(51, -2.25, 32, 0.25)
 poly!(ax, unclear, color=ColorSchemes.Set3_4[4])
-text!(ax, "Other"; position=Point2f(67, -2.5))
+text!(ax, "Other regulation"; position=Point2f(65, -2.4))
 
 fig
 CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "imgs", "crispr_all.pdf"), fig)
