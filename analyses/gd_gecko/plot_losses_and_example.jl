@@ -1,7 +1,6 @@
-using JSON,
-    ColorSchemes, CairoMakie, DataFrames, DataFramesMeta, Chain, CSV, COBREXA, Statistics
+using JSON, ColorSchemes, CairoMakie, DataFrames, DataFramesMeta, Chain, CSV, COBREXA, Statistics
 
-rdir = "linesearch_new"
+rdir = "linesearch"
 losses_dir = filter(endswith("losses.csv"), readdir(joinpath("results", rdir)))
 params_dir = filter(endswith("params.csv"), readdir(joinpath("results", rdir)))
 
@@ -23,9 +22,11 @@ subsys_df = DataFrame(
     Subsystem = [model.reactions[rid].subsystem for rid in reactions(model)],
 )
 
-
 #: Plot
-fig = Figure(resolution = (1200, 600), backgroundcolor = :transparent);
+fig = Figure(
+    resolution = (1200, 600), 
+    backgroundcolor = :transparent,
+);
 
 ga = fig[1, 1] = GridLayout()
 gb12 = fig[1, 2] = GridLayout()
@@ -91,8 +92,6 @@ Legend(
     margin = (10, 10, 10, 10),
 )
 
-fig
-
 #: kcats
 subsystem = "Glycolysis/Gluconeogenesis"
 
@@ -144,7 +143,7 @@ gb1[1, 2] = Legend(
 )
 hidexdecorations!(ax, label = false, ticklabels = false, ticks = false)
 hideydecorations!(ax, label = false, ticklabels = false, ticks = false)
-fig
+
 
 #: derivatives
 ax2 = Axis(

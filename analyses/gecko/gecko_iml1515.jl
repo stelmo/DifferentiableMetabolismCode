@@ -141,7 +141,7 @@ Visualize.plot_escher_viz(
     rids,
     fluxes,
     reaction_mass,
-    joinpath("data", "maps", "simplified_core_iml1515_map.json");
+    joinpath("data", "maps", "simplified_core_iml1515_map2.json");
     rts = 8,
     mts = 8,
 )
@@ -158,8 +158,8 @@ gb = fig[1, 2] = GridLayout()
 heatmap_ax_fluxes = Axis(
     ga[1, 1],
     xticklabelrotation = -pi / 2,
-    xlabel = "Reaction",
-    ylabel = "Turnover number",
+    xlabel = "Reaction\n(Response variable)",
+    ylabel = "Turnover number\n(Perturbed parameter)",
 );
 
 ylabs = Visualize.plot_heatmap(
@@ -181,7 +181,7 @@ fig
 heatmap_ax_genes = Axis(
     gb[1, 1],
     xticklabelrotation = -pi / 2,
-    xlabel = "Gene product",
+    xlabel = "Gene product\n(Response variable)",
     xlabelpadding = 70,
 );
 
