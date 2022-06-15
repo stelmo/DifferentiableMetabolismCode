@@ -61,7 +61,7 @@ for condition in conditions
     dflt = @subset(dfl, :Condition .== condition)
     sort!(dflt, :Iteration)
     if condition == master_id
-        color = ColorSchemes.Dark2_3[1]
+        color = ColorSchemes.Paired_6[2]
         lwidth = 3.0
         lines!(
             losses_ax,
@@ -77,8 +77,8 @@ hidexdecorations!(losses_ax, label = false, ticklabels = false, ticks = false)
 hideydecorations!(losses_ax, label = false, ticklabels = false, ticks = false)
 
 elms = [
-    LineElement(color = ColorSchemes.Dark2_3[1], linewidth = 3),
-    LineElement(color = ColorSchemes.ColorSchemes.Greys_4[3], linewidth = 2),
+    LineElement(color = ColorSchemes.Paired_6[2], linewidth = 3),
+    LineElement(color = ColorSchemes.Greys_4[3], linewidth = 2),
 ]
 
 Legend(
