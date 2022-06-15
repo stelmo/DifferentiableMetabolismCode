@@ -39,8 +39,7 @@ metabolite_df = DataFrame(CSV.File(joinpath("data", "crispr", "metabolite_data.c
 rename!(metabolite_df, Dict("KEGG number" => :Kegg))
 
 keggids = String.(metabolite_df[!, :Kegg])
-model =
-    load_model(StandardModel, joinpath("model_construction", "model_files", "iML1515.json"))
+model = load_model(StandardModel, joinpath("model_construction", "model_files", "iML1515.json"))
 kegg_mid_lu = Dict()
 for mid in metabolites(model)
     keggs = get(model.metabolites[mid].annotations, "kegg.compound", [])
@@ -68,6 +67,11 @@ ax2 = Axis(
     yaxisposition = :right,
     yscale = log2,
 )
+
+ax3 = Axis(
+    fig[1, 1],
+)
+
 hlines!(ax, 0.0, color = ColorSchemes.Greys_9[3])
 vlines!(ax, 1:3:(length(dirs)*3), color = ColorSchemes.Greys_9[3], linestyle = :dash)
 
@@ -135,8 +139,6 @@ for (resi, res) in zip(1:3:length(dirs)*3, dirs)
         marker = :rect,
         markersize = 10,
     )
-    # don't show cofactors (clutter reduction)
-    # cofactors = ["nadp", "nad", "nadph", "atp", "adp", "co2", "3psme", ""]
     mids = [substrate_ids; product_ids]
     midys = [substrate_sens; product_sens]
     midxs = [sub_xs; prod_xs]
@@ -203,27 +205,10 @@ for (resi, res) in zip(1:3:length(dirs)*3, dirs)
     )
 
     mids = mids[[prod_idxs; sub_idxs]]
-    midys = l2fc[[prod_idxs; sub_idxs]]
+    midys = log2.(l2fc[[prod_idxs; sub_idxs]])
     midxs = xs[[prod_idxs; sub_idxs]]
-
-    idxs = sortperm(midys)
-    mids = mids[idxs]
-    midys = midys[idxs]
-    midxs = midxs[idxs]
-    has_changed = true
-    adj = 0.12
-
-    while has_changed
-        has_changed = false
-        for i = 1:length(mids)-1
-            if abs(midys[i+1] - midys[i]) < adj
-                midys[i] -= adj
-                has_changed = true
-            end
-        end
-    end
     text!(
-        ax2,
+        ax3,
         mids;
         position = [Point2f(x, y) for (x, y) in zip(midxs, midys)],
         textsize = 12.0,
@@ -239,8 +224,11 @@ hidespines!(ax2)
 hidexdecorations!(ax2)
 hideydecorations!(ax2, label = false, ticklabels = false, ticks = false)
 ylims!(ax2, 2^-10, 2^10)
+ylims!(ax3, -10, 10)
 ylims!(ax, -2.5, 2.5)
 linkxaxes!(ax, ax2)
+linkxaxes!(ax, ax3)
+hidedecorations!(ax3)
 
 elem1 = [MarkerElement(color = ColorSchemes.Set2_6[1], marker = :rect, markersize = 10)]
 elem2 = [MarkerElement(color = ColorSchemes.Set2_6[2], marker = :rect, markersize = 10)]

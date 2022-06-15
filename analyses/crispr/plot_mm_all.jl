@@ -68,6 +68,11 @@ ax2 = Axis(
     yaxisposition = :right,
     yscale = log2,
 )
+
+ax3 = Axis(
+    fig[1, 1],
+)
+
 hlines!(ax, 0.0, color = ColorSchemes.Greys_9[3])
 vlines!(ax, 1:3:(length(dirs)*3), color = ColorSchemes.Greys_9[3], linestyle = :dash)
 
@@ -223,9 +228,9 @@ for (resi, res) in zip(1:3:length(dirs)*3, dirs)
         end
     end
     text!(
-        ax2,
+        ax3,
         mids;
-        position = [Point2f(x, y) for (x, y) in zip(midxs, midys)],
+        position = [Point2f(x, y) for (x, y) in zip(midxs, log2.(midys))],
         textsize = 12.0,
         align = (:left, :baseline),
     )
@@ -239,6 +244,7 @@ hidespines!(ax2)
 hidexdecorations!(ax2)
 hideydecorations!(ax2, label = false, ticklabels = false, ticks = false)
 ylims!(ax2, 2^-10, 2^10)
+ylims!(ax3, -10, 10)
 ylims!(ax, -2.5, 2.5)
 linkxaxes!(ax, ax2)
 
