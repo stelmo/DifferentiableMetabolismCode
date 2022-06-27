@@ -246,6 +246,7 @@ function linear_seach_descent(
     cap = (θ, dθ) -> dθ,
     save_on_iter = 100,
     loss_offset = 1,
+    reg_kcats = 0,
 )
 
     #: make reference problem
@@ -302,7 +303,7 @@ function linear_seach_descent(
 
         dLdx .= diffmodel.Q(diffmodel.θ) * x + diffmodel.c(diffmodel.θ)
 
-        dLdθ .= dxdθ[1:rf.nx, :]' * dLdx
+        dLdθ .= dxdθ[1:rf.nx, :]' * dLdx .+ reg_kcats .* diffmodel.θ 
 
         #: line search gradient descent
         θ .= diffmodel.θ

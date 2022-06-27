@@ -28,8 +28,7 @@ function main()
     master_id = parsed_args["master_id"]
     
     master_id_plus = master_id * "#" * join(rand(["A","B", "C", "D", "E", "F"], 8),"")
-    savedir = "/nfs/qtbscratch/stelmo/differentiable-metabolism-2022-random-init/$master_id_plus"
-    # savedir = "results"
+    savedir = "/nfs/qtbscratch/stelmo/differentiable-metabolism-2022-random-init-reg/$master_id_plus"
     !isdir(savedir) && mkdir(savedir)
 
     rescale_factor = 1e-6
@@ -117,6 +116,7 @@ function main()
         cap = cap,
         save_on_iter = 250,
         loss_offset,
+        reg_kcats = 0.01,
     )
 
     nothing
