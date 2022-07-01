@@ -29,3 +29,6 @@ Manifest.toml
 results/gecko
 results/linesearch
 results/linesearch_new
+results/gd_random_init
+results/gd_random_init_reg
+results/gd_random_init_reg2
