@@ -29,9 +29,7 @@ fig = Figure(
 );
 
 ga = fig[1, 1] = GridLayout()
-gb12 = fig[1, 2] = GridLayout()
-gb1 = gb12[1, 1] = GridLayout()
-gb2 = gb12[2, 1] = GridLayout()
+gbc = fig[1, 2] = GridLayout()
 
 #: Losses
 conditions = unique(dfl[!, :Condition])
@@ -102,7 +100,7 @@ end
 
 ax = Axis(
     title = "Glycolysis for $master_id",
-    gb1[1, 1],
+    gbc[1, 1],
     xscale = log10,
     yscale = log10,
     xlabel = "Iteration",
@@ -132,8 +130,8 @@ for (i, kcatid) in enumerate(kcatids)
         label = last(split(kcatid, "#")),
     )
 end
-gb1[1, 2] = Legend(
-    fig,
+Legend(
+    gbc[1, 2],
     ax,
     "Enzyme",
     framevisible = false,
@@ -144,11 +142,10 @@ gb1[1, 2] = Legend(
 hidexdecorations!(ax, label = false, ticklabels = false, ticks = false)
 hideydecorations!(ax, label = false, ticklabels = false, ticks = false)
 
-
 #: derivatives
 ax2 = Axis(
     title = "Glycolysis for $master_id",
-    gb2[1, 1],
+    gbc[2, 1],
     xscale = log10,
     xlabel = "Iteration",
     ylabel = "Turnover number\nscaled derivative",
@@ -174,9 +171,14 @@ hm = heatmap!(
 )
 
 ax2.yticks = (1:size(hmdata, 2), last.(split.(kcatids, "#")))
-Colorbar(gb2[1, 2], hm, label = "[AU]")
+Colorbar(
+    gbc[2, 2], 
+    hm, 
+    label = "[AU]",
+    halign = :left
+)
 
-for (label, layout) in zip(["A", "B", "C"], [ga, gb1, gb2])
+for (label, layout) in zip(["A", "B", "C"], [ga, gbc[1,1], gbc[2,1]])
     Label(
         layout[1, 1, TopLeft()],
         label,
