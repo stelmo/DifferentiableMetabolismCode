@@ -10,7 +10,7 @@ There are three main results in the paper:
 
 Note, the Julia environment used for the analyses can be recreated by activating
 the `Project.toml` file, as described
-(here)[https://pkgdocs.julialang.org/v1/environments/]. The directory `data`
+[here](https://pkgdocs.julialang.org/v1/environments/). The directory `data`
 contains all the data (turnover numbers, Michaelis constants, experimental data,
 etc.), as well as the scripts used to parse them into the format used in this
 work. The directory `model_construction` contains scripts used to download the
