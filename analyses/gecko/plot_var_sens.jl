@@ -55,8 +55,8 @@ ax = Axis(
     fig[1, 1],
     xlabel = "Metabolic module",
     ylabel = "Ratio of standard deviation to mean\n
-    of all direct sensitivitie across\n
-    all reactions in metabolic module",
+    of all direct sensitivities across all\n
+    reactions in metabolic module",
     xticklabelrotation=-pi/2,
 )
 
