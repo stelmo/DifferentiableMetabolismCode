@@ -12,6 +12,14 @@ gene_product_molar_mass = Dict(
 
 model.reactions["EX_glc__D_e"].lb = -1000.0 # unconstrain because enzyme constraints take over
 
+#= 
+Remove PFL from simulation because it is under anaerobic conditions. 
+PFL is oxygen sensisitive, and thus not likely to be active under 
+aerobic conditions.
+=#
+remove_reaction!(model, "PFL")
+delete!(reaction_kcats, "PFL")
+
 modifications = [
     change_optimizer_attribute("CPXPARAM_Emphasis_Numerical", 1),
     change_optimizer_attribute("CPX_PARAM_SCAIND", 1),
@@ -150,7 +158,10 @@ CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "
 
 #: plot sensitivities
 
-fig = Figure(resolution = (2000, 1000), backgroundcolor = :transparent);
+fig = Figure(
+    resolution = (2000, 1000), 
+    # backgroundcolor = :transparent,
+);
 
 ga = fig[1, 1] = GridLayout()
 gb = fig[1, 2] = GridLayout()
@@ -160,6 +171,8 @@ heatmap_ax_fluxes = Axis(
     xticklabelrotation = -pi / 2,
     xlabel = "Reaction\n(Response variable)",
     ylabel = "Turnover number\n(Perturbed parameter)",
+    xlabelsize = 26,
+    ylabelsize = 26,
 );
 
 ylabs = Visualize.plot_heatmap(
@@ -183,6 +196,8 @@ heatmap_ax_genes = Axis(
     xticklabelrotation = -pi / 2,
     xlabel = "Gene product\n(Response variable)",
     xlabelpadding = 70,
+    xlabelsize = 26,
+    ylabelsize = 26,
 );
 
 Visualize.plot_heatmap(

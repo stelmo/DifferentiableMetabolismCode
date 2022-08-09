@@ -59,7 +59,7 @@ function plot_heatmap(
     heatmap_ax.xticks = (1:length(vids), ylabs)
     heatmap_ax.yticks = (1:length(pids), [last(split(x, "#")) for x in pids])
 
-    Colorbar(color_bar_ax, hm, label = "Scaled sensitivity")
+    Colorbar(color_bar_ax, hm, label = "Scaled sensitivity", labelsize=20)
 
     return ylabs
 end
