@@ -230,6 +230,7 @@ CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "
 #: Plot proteome masses vs sensitivities
 gid_mass = JSON.parsefile(joinpath("results", "proteomic_mass", "gid_mass.json"))
 rid_mass = JSON.parsefile(joinpath("results", "proteomic_mass", "rid_mass.json"))
+delete!(rid_mass, "PFL")
 
 fig = Figure(backgroundcolor = :transparent);
 ax = Axis(
