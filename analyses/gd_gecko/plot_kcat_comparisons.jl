@@ -9,6 +9,7 @@ polished_df = DataFrame(CSV.File(joinpath("results", "gd_gecko", "polish_kmaxs_d
 vs_brenda = @select!(innerjoin(polished_df, davidi_df, on=:KcatID, makeunique=true), :KcatID, :Kcat, :Kmax) 
 vs_davidi = @select!(innerjoin(polished_df, davidi_df, on=:KcatID, makeunique=true), :KcatID, :Kmax, :Kmax_1)
 vs_heckmann = innerjoin(polished_df, heckmann_df, on=:KcatID, makeunique=true)
+brenda_heckman = innerjoin(@select(davidi_df, :KcatID, :Kcat), heckmann_df, on=:KcatID, makeunique=true)
 
 subsys_map = [
     "Nucleotide Salvage Pathway" "Nucleotide"
@@ -63,6 +64,9 @@ _rid_subsystem(x) = get(rid_subsystem, x, "Other")
 @transform!(vs_brenda, :Log10Diff = log10.(:Kmax) .- log10.(:Kcat), :FracDiff = (:Kmax .- :Kcat)./:Kcat, :Subsystem = _rid_subsystem.(:KcatID))
 @transform!(vs_davidi, :Log10Diff = log10.(:Kmax) .- log10.(:Kmax_1), :FracDiff = (:Kmax .- :Kmax_1)./:Kmax_1, :Subsystem = _rid_subsystem.(:KcatID))
 @transform!(vs_heckmann, :Log10Diff = log10.(:Kmax) .- log10.(:Kmax_1), :FracDiff = (:Kmax .- :Kmax_1)./:Kmax_1, :Subsystem = _rid_subsystem.(:KcatID))
+@transform!(brenda_heckman, :Subsystem = _rid_subsystem.(:KcatID))
+
+usubs = unique(vs_brenda[!, :Subsystem]) # unique subsystems
 
 #: Plot figure
 fig = Figure(
@@ -73,6 +77,7 @@ fig = Figure(
 ga = fig[1, 1] = GridLayout()
 gb = fig[1, 2] = GridLayout()
 gc = fig[2, 1] = GridLayout()
+gd = fig[2, 2] = GridLayout()
 
 lb = 10^-2
 ub = 10^4
@@ -80,7 +85,7 @@ ub = 10^4
 #: Brenda 
 kb = vs_brenda[!, :Kcat]
 kb_imp = vs_brenda[!, :Kmax]
-usubs = unique(vs_brenda[!, :Subsystem]) # unique subsystems
+
 kss = [
     ColorSchemes.Set2_6[findfirst(x -> x == id, usubs)] for id in vs_brenda[!, :Subsystem]
 ]
@@ -121,21 +126,10 @@ Legend(
     margin = (10, 10, 10, 10),
 )
 
-for (label, layout) in zip(["A", "B", "C"], [ga, gb, gc])
-    Label(
-        layout[1, 1, TopLeft()],
-        label,
-        textsize = 26,
-        padding = (0, 5, 5, 0),
-        halign = :right,
-    )
-end
-
-
 #: Davidi 
 kb = vs_davidi[!, :Kmax_1]
 kb_imp = vs_davidi[!, :Kmax]
-usubs = unique(vs_davidi[!, :Subsystem]) # unique subsystems
+# usubs = unique(vs_davidi[!, :Subsystem]) # unique subsystems
 kss = [
     ColorSchemes.Set2_6[findfirst(x -> x == id, usubs)] for id in vs_davidi[!, :Subsystem]
 ]
@@ -178,7 +172,7 @@ Legend(
 #: Heckmann
 kb = vs_heckmann[!, :Kmax_1]
 kb_imp = vs_heckmann[!, :Kmax]
-usubs = unique(vs_heckmann[!, :Subsystem]) # unique subsystems
+# usubs = unique(vs_heckmann[!, :Subsystem]) # unique subsystems
 kss = [
     ColorSchemes.Set2_6[findfirst(x -> x == id, usubs)] for id in vs_heckmann[!, :Subsystem]
 ]
@@ -218,7 +212,59 @@ Legend(
     margin = (10, 10, 10, 10),
 )
 
-for (label, layout) in zip(["A", "B", "C"], [ga, gb, gc])
+#: Heckman vs Brenda 
+kb = brenda_heckman[!, :Kcat]
+kb_heck = brenda_heckman[!, :Kmax]
+# usubs = unique(brenda_heckman[!, :Subsystem]) # unique subsystems
+kss = [
+    ColorSchemes.Set2_6[findfirst(x -> x == id, usubs)] for id in brenda_heckman[!, :Subsystem]
+]
+
+brenda_heckman_ax = Axis(
+    gd[1, 1],
+    yscale = log10,
+    xscale = log10,
+    xlabel = "BRENDA turnover number [1/s]",
+    ylabel = "Heckmann et. al. turnover number [1/s]",
+)
+scatter!(brenda_heckman_ax, kb, kb_heck, color = kss)
+
+lines!(brenda_heckman_ax, [lb, ub], [lb, ub], color = ColorSchemes.Greys_9[3], linestyle = :dash)
+xlims!(brenda_heckman_ax, lb, ub)
+ylims!(brenda_heckman_ax, lb, ub)
+
+hidexdecorations!(brenda_heckman_ax, label = false, ticklabels = false, ticks = false)
+hideydecorations!(brenda_heckman_ax, label = false, ticklabels = false, ticks = false)
+
+elms = [
+    MarkerElement(
+        color = ColorSchemes.Set2_6[findfirst(x -> x == id, usubs)],
+        marker = '●',
+        markersize = 15,
+    ) for id in usubs
+]
+
+Legend(
+    gd[1, 1],
+    elms,
+    usubs,
+    "Metabolic module",
+    halign = :right,
+    valign = :bottom,
+    tellheight = false,
+    tellwidth = false,
+    margin = (10, 10, 10, 10),
+)
+
+#: get R2 of brenda vs heckmann
+using GLM, DataFrames
+df = DataFrame(Y = log10.(kb_heck), X = log10.(kb))
+f = lm(@formula(Y ~ X), df)
+r2(f)
+
+#: Add layout
+
+for (label, layout) in zip(["A", "B", "C", "D"], [ga, gb, gc, gd])
     Label(
         layout[1, 1, TopLeft()],
         label,
