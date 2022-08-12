@@ -174,7 +174,6 @@ ax2.yticks = (1:size(hmdata, 2), last.(split.(kcatids, "#")))
 Colorbar(
     gbc[2, 2], 
     hm, 
-    label = "[AU]",
     halign = :left
 )
 
