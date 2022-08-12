@@ -1,4 +1,4 @@
-using JSON, ColorSchemes, CairoMakie, DataFrames, DataFramesMeta, Chain, CSV, COBREXA, Statistics, GLM
+using JSON, ColorSchemes, CairoMakie, DataFrames, DataFramesMeta, Chain, CSV, COBREXA, Statistics, GLM, Colors
 
 #: load kcat data from GD
 rdir = "linesearch"
@@ -113,8 +113,8 @@ r2(g)
 
 #: Plot figure
 fig = Figure(
-    resolution = (1200, 1200),
-    # backgroundcolor = :transparent,
+    # resolution = (1200, 1200),
+    backgroundcolor = :transparent,
 );
 ax = Axis(
     fig[1, 1],
@@ -123,16 +123,16 @@ ax = Axis(
     xlabel = "BRENDA turnover number [1/s]",
     ylabel = "Estimated turnover number [1/s]",
 )
-scatter!(ax, all_data[!, :Kcat], all_data[!, :KmaxML], color=:red, label= "ML")
-scatter!(ax, all_data[!, :Kcat], all_data[!, :KmaxGD], color=:blue, label = "GD")
+scatter!(ax, all_data[!, :Kcat], all_data[!, :KmaxML], color=:tomato, label= "ML")
+scatter!(ax, all_data[!, :Kcat], all_data[!, :KmaxGD], color=:lightskyblue, label = "GD")
 
 bmin, bmax = extrema(all_data[!, :Kcat])
 b_ex = DataFrame(X=log10.([bmin, bmax]))
 f_ys = predict(f, b_ex)
-lines!(ax, [bmin, bmax], 10 .^(f_ys), color=:red)
+lines!(ax, [bmin, bmax], 10 .^(f_ys), color=:tomato)
 
 g_ys = predict(g, b_ex)
-lines!(ax, [bmin, bmax], 10 .^(g_ys), color=:blue)
+lines!(ax, [bmin, bmax], 10 .^(g_ys), color=:lightskyblue)
 
 
 hidexdecorations!(ax, ticks = false, ticklabels = false, label = false)
