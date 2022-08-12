@@ -111,13 +111,22 @@ df = DataFrame(Y = log10.(all_data[!, :KmaxGD]), X = log10.(all_data[!, :Kcat]))
 g = lm(@formula(Y ~ X), df)
 r2(g)
 
+#ml vs gd
+df = DataFrame(X = log10.(all_data[!, :KmaxML]), Y = log10.(all_data[!, :KmaxGD]))
+h = lm(@formula(Y ~ X), df)
+r2(h)
+
 #: Plot figure
 fig = Figure(
     # resolution = (1200, 1200),
     backgroundcolor = :transparent,
 );
+
+ga = fig[1, 1] = GridLayout()
+gb = fig[1, 2] = GridLayout()
+
 ax = Axis(
-    fig[1, 1],
+    ga[1, 1],
     yscale = log10,
     xscale = log10,
     xlabel = "BRENDA turnover number [1/s]",
@@ -134,10 +143,34 @@ lines!(ax, [bmin, bmax], 10 .^(f_ys), color=:tomato)
 g_ys = predict(g, b_ex)
 lines!(ax, [bmin, bmax], 10 .^(g_ys), color=:lightskyblue)
 
-
 hidexdecorations!(ax, ticks = false, ticklabels = false, label = false)
 hideydecorations!(ax, ticks = false, ticklabels = false, label = false)
 axislegend("Estimation method", position = :rb)
+
+ax2 = Axis(
+    gb[1, 1],
+    yscale = log10,
+    xscale = log10,
+    xlabel = "Heckmann et. al. turnover number [1/s]",
+    ylabel = "Improved turnover number [1/s]",
+)
+scatter!(ax2, all_data[!, :KmaxML], all_data[!, :KmaxGD], color=:seagreen3)
+lb, ub = extrema(all_data[!, :KmaxML])
+lines!(ax2, [lb, ub], [lb, ub], color = ColorSchemes.Greys_9[3], linestyle = :dash)
+hidexdecorations!(ax2, ticks = false, ticklabels = false, label = false)
+hideydecorations!(ax2, ticks = false, ticklabels = false, label = false)
+
+for (label, layout) in zip(["A", "B"], [ga, gb])
+    Label(
+        layout[1, 1, TopLeft()],
+        label,
+        textsize = 26,
+        # font = noto_sans_bold,
+        padding = (0, 5, 5, 0),
+        halign = :right,
+    )
+end
+
 fig
 
 CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "imgs", "unmeasured_proteome_kcats.pdf"), fig)
