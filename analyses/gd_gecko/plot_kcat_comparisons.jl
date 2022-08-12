@@ -70,8 +70,8 @@ usubs = unique(vs_brenda[!, :Subsystem]) # unique subsystems
 
 #: Plot figure
 fig = Figure(
-    resolution = (1200, 1200)
-    # backgroundcolor = :transparent,
+    resolution = (1200, 1200),
+    backgroundcolor = :transparent,
 );
 
 ga = fig[1, 1] = GridLayout()
