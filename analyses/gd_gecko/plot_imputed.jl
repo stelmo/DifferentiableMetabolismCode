@@ -118,12 +118,12 @@ r2(h)
 
 #: Plot figure
 fig = Figure(
-    # resolution = (1200, 1200),
+    resolution = (1000, 600),
     backgroundcolor = :transparent,
 );
 
-ga = fig[1, 1] = GridLayout()
-gb = fig[1, 2] = GridLayout()
+gb = fig[1, 1] = GridLayout()
+ga = fig[1, 2] = GridLayout()
 
 ax = Axis(
     ga[1, 1],
