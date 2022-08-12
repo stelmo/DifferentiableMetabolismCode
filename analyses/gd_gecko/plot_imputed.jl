@@ -160,7 +160,7 @@ lines!(ax2, [lb, ub], [lb, ub], color = ColorSchemes.Greys_9[3], linestyle = :da
 hidexdecorations!(ax2, ticks = false, ticklabels = false, label = false)
 hideydecorations!(ax2, ticks = false, ticklabels = false, label = false)
 
-for (label, layout) in zip(["A", "B"], [ga, gb])
+for (label, layout) in zip(["A", "B"], [gb, ga])
     Label(
         layout[1, 1, TopLeft()],
         label,
