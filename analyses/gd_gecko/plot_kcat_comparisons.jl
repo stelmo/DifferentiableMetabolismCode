@@ -256,12 +256,6 @@ Legend(
     margin = (10, 10, 10, 10),
 )
 
-#: get R2 of brenda vs heckmann
-using GLM, DataFrames
-df = DataFrame(Y = log10.(kb_heck), X = log10.(kb))
-f = lm(@formula(Y ~ X), df)
-r2(f)
-
 #: Add layout
 
 for (label, layout) in zip(["A", "B", "C", "D"], [ga, gb, gc, gd])
@@ -277,3 +271,21 @@ end
 fig
 
 CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "imgs", "kmax_brenda_davidi_heckmann.pdf"), fig)
+
+#: get R2 of brenda vs heckmann comparing the same enzymes
+using GLM, DataFrames
+@select!(brenda_heckman, :KcatID, :Kmax)
+@select!(vs_brenda, :KcatID, :Kmax, :Kcat)
+
+rename!(vs_brenda, Dict("Kmax" => :GDKmax))
+rename!(brenda_heckman, Dict("Kmax" => :MLKmax))
+
+df = innerjoin(vs_brenda, brenda_heckman, on = :KcatID)
+
+_df = DataFrame(Y = log10.(df[!, :GDKmax]), X = log10.(df[!, :Kcat]))
+f = lm(@formula(Y ~ X), _df)
+r2(f)
+
+_df = DataFrame(Y = log10.(df[!, :MLKmax]), X = log10.(df[!, :Kcat]))
+f = lm(@formula(Y ~ X), _df)
+r2(f)
