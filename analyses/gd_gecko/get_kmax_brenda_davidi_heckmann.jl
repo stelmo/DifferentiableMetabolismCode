@@ -2,25 +2,40 @@ using JSON, ColorSchemes, CairoMakie, DataFrames, DataFramesMeta, Chain, CSV, CO
 
 #: load kcat data
 rdir = "linesearch"
+losses_dir = filter(endswith("losses.csv"), readdir(joinpath("results", rdir)))
 params_dir = filter(endswith("params.csv"), readdir(joinpath("results", rdir)))
 
-kmax_df = DataFrame(Condition = String[], KcatID = String[], Kmax = Float64[])
-for dir in params_dir
+dfl = DataFrame(Condition = String[], Loss = Float64[], Iteration = Int64[])
+for dir in losses_dir
+    append!(dfl, DataFrame(CSV.File(joinpath("results", rdir, dir))))
+end
+master_ids = unique(dfl[!, :Condition])
+
+cond_minlossiter = Dict()
+for gdf in groupby(dfl, :Condition)
+    losses = gdf[!, :Loss]
+    idx = argmin(losses)
+    cond_minlossiter[gdf[idx, :Condition]] = gdf[idx, :Iteration]
+end
+
+#: load kcat data
+kbest_df = DataFrame(Condition = String[], KcatID = String[], Kcat = Float64[], Derivative = Float64[], Iteration = Float64[])
+for master_id in master_ids
     try
-        gdf = groupby(DataFrame(CSV.File(joinpath("results", rdir, dir))), :KcatID)
-        df = combine(gdf, :Kcat => maximum => :Kmax)
-        cond = join(split(dir, "#")[1:2], "#")
-        n = size(df, 1)
+        pdirfile = master_id * "#params.csv"
+        dfp = DataFrame(CSV.File(joinpath("results", rdir, pdirfile)))
+
+        df = @subset dfp @byrow begin 
+            :Iteration == cond_minlossiter[master_id]
+        end
+
+    
         append!(
-            kmax_df,
-            DataFrame(
-                Condition = fill(cond, n),
-                KcatID = df[!, :KcatID],
-                Kmax = df[!, :Kmax],
-            ),
+            kbest_df,
+            df,
         )
     catch err
-        println("failed on ", dir)
+        println("failed on ", master_id)
     end
 end
 
@@ -92,7 +107,8 @@ subsys_df = innerjoin(subsys_df, df_sys_map, on = :Subsystem)
 @select!(subsys_df, :KcatID, :SubID)
 
 #: find kmax overall
-kmax_overall_df = combine(groupby(kmax_df, :KcatID), :Kmax => maximum => :Kmax)
+# kmax_overall_df = combine(groupby(kmax_df, :KcatID), :Kmax => maximum => :Kmax)
+kmax_overall_df = combine(groupby(kbest_df, :KcatID), :Kcat => maximum => :Kmax)
 @transform!(kmax_overall_df, :Kmax = 1 / (3600 * 1e-6) .* :Kmax)
 CSV.write(joinpath("results", "gd_gecko", "polish_kmaxs_df.csv"), kmax_overall_df)
 

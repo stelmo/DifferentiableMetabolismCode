@@ -1,99 +1,149 @@
-using JSON, DataFrames, DataFramesMeta, Chain, CSV, Statistics, COBREXA, CairoMakie, ColorSchemes, Colors
+using JSON, DataFrames, DataFramesMeta, Chain, CSV, Statistics, Colors, CairoMakie
 
-model = load_model(StandardModel, joinpath("model_construction", "model_files", "iML1515.json"))
-subsys_df = DataFrame(
-    KcatID = "k#" .* reactions(model),
-    Subsystem = [model.reactions[rid].subsystem for rid in reactions(model)],
-)
-
-subsystem = "Glycolysis/Gluconeogenesis"
-subsystem_kcatids = @subset(subsys_df, :Subsystem .== subsystem)[!, :KcatID]
-
-
-#: Load data from random init 
+#: Load random starting point GD kcats
 rdir = "gd_random_init"
+losses_dir = filter(endswith("losses.csv"), readdir(joinpath("results", rdir)))
 params_dir = filter(endswith("params.csv"), readdir(joinpath("results", rdir)))
-maxiter = 0
 
-rinit_dict = Dict{String, Dict{String, Dict{Int, Vector{Float64}}}}()
-
-for dir in params_dir
-    println(dir)
-    random_init_df = DataFrame(CSV.File(joinpath("results", rdir, dir)))
-    @select!(random_init_df, :Condition, :KcatID, :Kcat, :Iteration)
-    @subset! random_init_df @byrow begin
-        in(:KcatID, subsystem_kcatids)
-    end
-    dname = join(split(dir, "#")[1:2], "#")
-    if !haskey(rinit_dict, dname)
-        rinit_dict[dname] = Dict{String, Dict{Int, Vector{Float64}}}()
-    end
-    for gdf in groupby(random_init_df, :KcatID)
-        sort!(gdf, [:Iteration])
-        kname = String(first(gdf[!, :KcatID]))
-        if haskey(rinit_dict[dname], kname)
-            for (x, y) in zip(gdf[!, :Iteration], gdf[!, :Kcat])
-                if haskey(rinit_dict[dname][kname], x)
-                    push!(rinit_dict[dname][kname][x], y)
-                else
-                    rinit_dict[dname][kname][x] = [y]
-                end
-            end
-        else
-            rinit_dict[dname][kname] = Dict(x => [y] for (x, y) in zip(gdf[!, :Iteration], gdf[!, :Kcat]))
-        end
-    end
-    maxiter = max(maxiter, maximum(random_init_df[!, :Iteration]))    
+dfl = DataFrame(Condition = String[], Loss = Float64[], Iteration = Int64[])
+for dir in losses_dir
+    append!(dfl, DataFrame(CSV.File(joinpath("results", rdir, dir))))
 end
-rinit_dict
+master_ids = unique(dfl[!, :Condition])
 
-#: load kcat from ML GD data
+cond_minlossiter = Dict()
+for gdf in groupby(dfl, :Condition)
+    losses = gdf[!, :Loss]
+    idx = argmin(losses)
+    cond_minlossiter[gdf[idx, :Condition]] = gdf[idx, :Iteration]
+end
+
+random_df = DataFrame(Condition = String[], KcatID = String[], Kcat = Float64[], Derivative = Float64[], Iteration = Float64[])
+for master_id in master_ids
+    try
+        pdirfile = master_id * "#params.csv"
+        dfp = DataFrame(CSV.File(joinpath("results", rdir, pdirfile)))
+
+        df = @subset dfp @byrow begin 
+            :Iteration == cond_minlossiter[master_id]
+        end
+
+        append!(
+            random_df,
+            df,
+        )
+    catch err
+        println("failed on ", master_id)
+    end
+end
+
+@transform!(random_df, :Kcat = 1 / (3600 * 1e-6) .* :Kcat)
+
+@transform! random_df @byrow begin 
+    :Condition = join(split(:Condition, "#")[1:2], "#")
+end
+
+@subset! random_df @byrow begin 
+    abs(:Derivative) .< 1e-1 # only select values that are not changing much
+end
+
+rd_df = combine(groupby(random_df, :KcatID), :Kcat => mean => :Kcat_mean, :Kcat => std => :Kcat_std)
+
+#: Load ML starting point GD kcats
 rdir = "linesearch"
-params_dir = filter(startswith("WT"), filter(endswith("params.csv"), readdir(joinpath("results", rdir))))
+losses_dir = filter(endswith("losses.csv"), readdir(joinpath("results", rdir)))
+params_dir = filter(endswith("params.csv"), readdir(joinpath("results", rdir)))
 
-ml_init_df = DataFrame(Condition = String[], KcatID = String[], Kmax = Float64[])
+dfl = DataFrame(Condition = String[], Loss = Float64[], Iteration = Int64[])
+for dir in losses_dir
+    append!(dfl, DataFrame(CSV.File(joinpath("results", rdir, dir))))
+end
+master_ids = unique(dfl[!, :Condition])
 
-ml_dict = Dict{String, Dict{String, Dict{Int, Float64}}}()
-for dir in params_dir
-    df = DataFrame(CSV.File(joinpath("results", rdir, dir)))
-    @subset! df @byrow begin
-        in(:KcatID, subsystem_kcatids)
-        :Iteration <= maxiter
-    end
-    dname = join(split(dir, "#")[1:2], "#")
-    ml_dict[dname] = Dict{String, Dict{Int, Float64}}()
-    for gdf in groupby(df, :KcatID)
-        sort!(gdf, [:Iteration])
-        kname = String(first(gdf[!, :KcatID]))
-        ml_dict[dname][kname] = Dict(gdf[!, :Iteration] .=> gdf[!, :Kcat])
-    end
+cond_minlossiter = Dict()
+for gdf in groupby(dfl, :Condition)
+    losses = gdf[!, :Loss]
+    idx = argmin(losses)
+    cond_minlossiter[gdf[idx, :Condition]] = gdf[idx, :Iteration]
 end
 
-ml_dict
+#: load kcat data
+mlgd_df = DataFrame(Condition = String[], KcatID = String[], Kcat = Float64[], Derivative = Float64[], Iteration = Float64[])
+for master_id in master_ids
+    !startswith(master_id, "WT") && continue
+    try
+        pdirfile = master_id * "#params.csv"
+        dfp = DataFrame(CSV.File(joinpath("results", rdir, pdirfile)))
 
-#: Normalize
-for (k, v) in rinit_dict
-    for (kk, vv) in v 
-        for (kkk, vvv) in vv 
-            vvv ./= ml_dict[k][kk][kkk]
+        df = @subset dfp @byrow begin 
+            :Iteration == cond_minlossiter[master_id]
         end
+
+        append!(
+            mlgd_df,
+            df,
+        )
+    catch err
+        println("failed on ", master_id)
     end
 end
-rinit_dict
+
+@transform!(mlgd_df, :Kcat = 1 / (3600 * 1e-6) .* :Kcat)
+
+@subset! mlgd_df @byrow begin 
+    abs(:Derivative) .< 1e-1 # only select values that are not changing much
+end
+
+_gd_df = combine(groupby(mlgd_df, :KcatID), :Kcat => mean => :Kcat_mean_gd, :Kcat => std => :Kcat_std_gd)
+gd_df = @subset _gd_df @byrow begin
+    !isnan(:Kcat_std_gd)
+end 
+
 #: Plot
 
-p = subsystem_kcatids[2]
-fig = Figure()
-ax = Axis(fig[1,1], xscale=log10, yscale=log10)
-css = ColorSchemes.Dark2_4
+df = innerjoin(rd_df, gd_df, on = :KcatID)
 
-for (i, k) in enumerate(keys(rinit_dict))
-    v = rinit_dict[k][p]
-    for (kk, vv) in v 
-        scatter!(ax, fill(kk, length(vv)), vv, color=css[i])
-    end
-end
+xs = log10.(df[!, :Kcat_mean]./df[!, :Kcat_mean_gd])
+
+count(-0.5 .< xs .< 0.5)/length(xs)
+
+fig = Figure(
+    # resolution = (1200, 1200),
+    backgroundcolor = :transparent,
+)
+ax = Axis(
+    fig[1,1],
+    xlabel = "Log ratio of random start kcat to ML start kcat",
+    ylabel = "Density"
+)
+
+density!(ax, xs; npoints=50, color= :darkturquoise)
+lines!(ax, [0,0], [0, 1.5], color = :tomato, linewidth=8)
+lines!(ax, [-0.5,-0.5], [0, 1.], color = :mediumorchid2, linewidth=6)
+lines!(ax, [0.5, 0.5], [0, 1.], color = :mediumorchid2, linewidth=6)
+
+arrows!(ax, [0,0],[1,1],[0.45,-0.45],[0.0,0], color=:mediumorchid2, linewidth=6,arrowsize=16)
+
+hidexdecorations!(ax, label = false, ticklabels = false, ticks = false)
+hideydecorations!(ax, label = false, ticklabels = false, ticks = false)
+
+Legend(
+    fig[1,1],
+    [
+        [PolyElement(color = :mediumorchid2, strokecolor = :mediumorchid2, strokewidth = 1),],
+        [PolyElement(color = :tomato, strokecolor = :tomato, strokewidth = 1),],
+    ],
+    [
+        "Optimal random start iterate within 3\nfold of ML start optimal iterate",
+        "Optimal random start iterate not changed\nwrt ML start optimal start iterate",
+    ],
+    tellheight = false,
+    tellwidth = false,
+    halign = :right, 
+    valign = :top,
+    margin = (10, 10, 10, 10),
+)
+
 fig
 
-
-
+CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "imgs", "random_start_vs_ml_start_ratio.pdf"), fig)
