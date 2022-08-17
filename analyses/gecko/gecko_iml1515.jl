@@ -160,7 +160,7 @@ CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "
 
 fig = Figure(
     resolution = (2000, 1000), 
-    # backgroundcolor = :transparent,
+    backgroundcolor = :transparent,
 );
 
 ga = fig[1, 1] = GridLayout()
@@ -324,8 +324,7 @@ for (i, pid) in enumerate(diffmodel.param_ids)
 end
 
 fig = Figure(
-    resolution = (1000, 1000),
-    # backgroundcolor=:transparent,
+    backgroundcolor=:transparent,
 );
 
 ax = Axis(
