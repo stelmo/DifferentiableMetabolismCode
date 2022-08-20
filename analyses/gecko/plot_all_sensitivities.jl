@@ -97,3 +97,4 @@ Legend(
 fig
 CairoMakie.FileIO.save(joinpath("..", "DifferentiableMetabolismPaper", "docs", "imgs", "average_sens.pdf"), fig)
 
+count(maxfluxsens .> 1e-2)
