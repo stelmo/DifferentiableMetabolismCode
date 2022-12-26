@@ -1,7 +1,8 @@
 # DifferentiableMetabolismCode
  
-The code in this repo can be used to reproduce all of the results in the associated paper
-(TODO: add link to paper).
+The code in this repo can be used to reproduce all of the results in the [associated paper](https://www.sciencedirect.com/science/article/pii/S1096717622001173)
+Interrogating the effect of enzyme kinetics on metabolism using differentiable constraint-based models
+(preprint [here](https://www.biorxiv.org/content/10.1101/2022.07.11.499575v1)).
 
 There are three main results in the paper:
 1. Sensitivity analysis of an enzyme constrained GECKO model
